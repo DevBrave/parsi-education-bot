@@ -42,6 +42,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'telegram' => [             
+        'driver' => 'telegram',
+        'provider' => 'users',   // same User model, different identification method
+    ],
     ],
 
     /*

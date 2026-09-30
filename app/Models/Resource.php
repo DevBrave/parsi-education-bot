@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'course_id',
@@ -18,6 +20,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Resource extends Model
 {
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function resourceType(): BelongsTo
+    {
+        return $this->belongsTo(ResourceType::class);
+    }
+
+    public function academicYear(): BelongsTo
+    {
+        return $this->belongsTo(AcademicYear::class);
+    }
+
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by');
@@ -26,5 +43,15 @@ class Resource extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function professors(): BelongsToMany
+    {
+        return $this->belongsToMany(Professor::class);
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(ResourceFile::class);
     }
 }
