@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TelegramWebhookController;
+use App\Http\Middleware\EnsureTelegramTokenIsValid;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,4 +16,5 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
+    ->middleware(EnsureTelegramTokenIsValid::class)
     ->name('telegram.webhook');

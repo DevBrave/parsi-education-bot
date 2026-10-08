@@ -37,7 +37,7 @@ class TelegramService
         }
 
         $response = Http::post("{$this->baseUrl}/sendMessage", $payload);
-        
+
         if ($response->failed()) {
             Log::error('Telegram sendMessage failed', [
                 'chat_id' => $chatId,
@@ -122,13 +122,71 @@ class TelegramService
         if ($text !== null) {
             $payload['text'] = $text;
         }
+        
 
         return Http::post("{$this->baseUrl}/answerCallbackQuery", $payload);
     }
 
     /**
-     * Test bot token validity.
+     * Upload and send a document from a local file path to Telegram.
+     * Returns file_id and file_unique_id on success.
      */
+    public function uploadDocument(string|int $chatId, string $filePath, string $filename, ?string $caption = null): ?array
+    {
+        $response = Http::timeout(120)
+            ->attach('document', file_get_contents($filePath), $filename)
+            ->post("{$this->baseUrl}/sendDocument", array_filter([
+                'chat_id' => $chatId,
+                'caption' => $caption,
+            ]));
+
+        if (! $response->json('ok')) {
+            Log::error('Telegram uploadDocument failed', [
+                'chat_id' => $chatId,
+                'response' => $response->json(),
+            ]);
+            return null;
+        }
+
+        $document = $response->json('result.document');
+
+        return [
+            'file_id' => $document['file_id'] ?? null,
+            'file_unique_id' => $document['file_unique_id'] ?? null,
+            'message_id' => $response->json('result.message_id'),
+        ];
+    }
+
+    /**
+     * Send an existing Telegram document by file_id with optional caption.
+     */
+    public function sendDocument(
+        int $chatId,
+        string $fileId,
+        ?string $caption = null,
+        string $parseMode = 'HTML'
+    ): Response {
+        $payload = [
+            'chat_id' => $chatId,
+            'document' => $fileId,
+        ];
+
+        if ($caption !== null) {
+            $payload['caption'] = $caption;
+            $payload['parse_mode'] = $parseMode;
+        }
+        
+        $response = Http::post("{$this->baseUrl}/sendDocument", $payload);
+        if (! $response->json('ok')) {
+            Log::error('Telegram sendDocument failed', [
+                'chat_id' => $chatId,
+                'description' => $response->json('description'),
+            ]);
+        }
+
+        return $response;
+    }
+
     public function getMe(): Response
     {
         return Http::get("{$this->baseUrl}/getMe");
