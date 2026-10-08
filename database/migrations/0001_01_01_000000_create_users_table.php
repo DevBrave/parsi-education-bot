@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('telegram_user_id')->unique();
-            $table->string('username',64)->nullable();
-            $table->string('first_name',100);
-            $table->string('last_name',100)->nullable();
-            $table->string('preferred_language',10)->default('en');
+            $table->string('username', 64)->nullable();
+            $table->string('first_name', 100);
+            $table->string('last_name', 100)->nullable();
+            $table->string('preferred_language', 10)->default('en');
             $table->string('role')->default('student');
             $table->boolean('is_blocked')->default(false);
             $table->timestamps();

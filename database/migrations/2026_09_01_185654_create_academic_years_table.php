@@ -18,7 +18,6 @@ return new class extends Migration
             $table->date('ends_on');
             $table->boolean('is_current')->default(false);
 
-            
         });
     }
 

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 ])]
 class Course extends Model
 {
-     public function programs(): BelongsToMany
+    public function programs(): BelongsToMany
     {
         return $this->belongsToMany(Program::class);
     }

@@ -54,5 +54,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Resource::class, 'reviewed_by');
     }
-
 }

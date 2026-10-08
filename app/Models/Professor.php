@@ -5,14 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $full_name
  * @property string|null $university_email
  * @property bool $is_active
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 #[Fillable([
     'full_name',
@@ -21,8 +22,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 ])]
 class Professor extends Model
 {
-   
-
     public function resources(): BelongsToMany
     {
         return $this->belongsToMany(Resource::class);

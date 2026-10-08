@@ -17,6 +17,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'exam_date',
     'language',
     'has_solutions',
+    'status',
+    'submitted_by',
+    'reviewed_by',
+    'reviewed_at',
 ])]
 class Resource extends Model
 {

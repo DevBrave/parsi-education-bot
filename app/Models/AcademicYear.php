@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $label
- * @property \Illuminate\Support\Carbon $starts_on
- * @property \Illuminate\Support\Carbon $ends_on
+ * @property Carbon $starts_on
+ * @property Carbon $ends_on
  * @property bool $is_current
  */
 #[Fillable([

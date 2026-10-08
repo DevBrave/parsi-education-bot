@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('resource_id')
-                  ->constrained('resources')
-                  ->cascadeOnDelete();
+                ->constrained('resources')
+                ->cascadeOnDelete();
 
             $table->string('original_filename', 255);
             $table->string('mime_type', 100);

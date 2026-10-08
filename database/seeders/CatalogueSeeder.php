@@ -21,7 +21,7 @@ class CatalogueSeeder extends Seeder
         $course = Course::firstOrCreate(
             ['course_code' => '01TXFSM'],
             [
-                'name'    => 'Internet of Things',
+                'name' => 'Internet of Things',
                 'credits' => 6.0,
             ],
         );
@@ -44,7 +44,7 @@ class CatalogueSeeder extends Seeder
         $circuitCourse = Course::firstOrCreate(
             ['course_code' => '02ELCSM'],
             [
-                'name'    => 'Circuit Analysis',
+                'name' => 'Circuit Analysis',
                 'credits' => 6.0,
             ],
         );

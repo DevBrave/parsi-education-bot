@@ -1,23 +1,26 @@
 <?php
+
 namespace App\Auth;
+
 use App\Models\User;
-use Illuminate\Contracts\Auth\Guard;          
-use Illuminate\Contracts\Auth\UserProvider;   
-use Illuminate\Auth\GuardHelpers;            
+use Illuminate\Auth\GuardHelpers;
+use Illuminate\Contracts\Auth\Guard;
+use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Http\Request;
+
 class TelegramGuard implements Guard
 {
     use GuardHelpers;  // Implements check(), guest(), id(), setUser() automatically
+
     /**
      * The current HTTP request (contains the Telegram webhook JSON).
      */
     protected Request $request;
 
-
     public function __construct(UserProvider $provider, Request $request)
     {
-        $this->provider = $provider;   
-        $this->request = $request;     
+        $this->provider = $provider;
+        $this->request = $request;
     }
 
     /**
@@ -28,7 +31,7 @@ class TelegramGuard implements Guard
      */
     public function user(): ?User
     {
-        
+
         if ($this->user !== null) {
             return $this->user;
         }
@@ -39,10 +42,10 @@ class TelegramGuard implements Guard
         if ($telegramUserId) {
             $this->user = User::where('telegram_user_id', $telegramUserId)->first();
         }
+
         return $this->user;
     }
 
-    
     /**
      * Required by the Guard contract.
      * "Can these credentials identify a user?"
@@ -51,6 +54,7 @@ class TelegramGuard implements Guard
     public function validate(array $credentials = []): bool
     {
         $user = User::where('telegram_user_id', $credentials['telegram_user_id'] ?? null)->first();
+
         return $user !== null;
     }
 }

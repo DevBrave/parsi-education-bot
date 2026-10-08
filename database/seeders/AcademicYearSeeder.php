@@ -12,8 +12,8 @@ class AcademicYearSeeder extends Seeder
         AcademicYear::firstOrCreate(
             ['label' => '2025/26'],
             [
-                'starts_on'  => '2025-10-01',
-                'ends_on'    => '2026-09-30',
+                'starts_on' => '2025-10-01',
+                'ends_on' => '2026-09-30',
                 'is_current' => true,
             ],
         );

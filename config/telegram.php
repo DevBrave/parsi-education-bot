@@ -15,4 +15,6 @@ return [
     'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET', ''),
 
     'api_url' => 'https://api.telegram.org/bot',
+
+    'storage_channel_id' => env('TELEGRAM_STORAGE_CHANNEL_ID', ''),
 ];
