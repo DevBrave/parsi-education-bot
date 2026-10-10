@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('username', 64)->nullable();
             $table->string('first_name', 100);
             $table->string('last_name', 100)->nullable();
-            $table->string('preferred_language', 10)->default('en');
+            $table->string('preferred_language', 10)->nullable()->default(null);
             $table->string('role')->default('student');
             $table->boolean('is_blocked')->default(false);
             $table->timestamps();
