@@ -65,6 +65,34 @@ class TelegramMenuTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_persian_user_receives_persian_menu(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $user = new User(['first_name' => 'Ali', 'preferred_language' => 'fa']);
+
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 99], 'text' => '/start'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 فایل‌های آموزشی'
+            && str_contains($request['text'], 'به ربات تلگرام انجمن پارسی خوش آمدید'));
+    }
+
+    public function test_italian_user_receives_italian_menu(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $user = new User(['first_name' => 'Marco', 'preferred_language' => 'it']);
+
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 100], 'text' => '/start'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 Materiali Didattici'
+            && str_contains($request['text'], 'Benvenuto su PARSI Education Bot'));
+    }
+
     private function invokeHandler(string $method, array $arguments): void
     {
         $controller = app(TelegramWebhookController::class);

@@ -11,8 +11,9 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of active programmes from database.
      */
-    public static function programmes(): array
+    public static function programmes(?string $lang = 'en'): array
     {
+        $lang = $lang ?: 'en';
         $programs = Program::where('is_active', true)->orderBy('name')->get();
 
         $rows = [];
@@ -24,7 +25,7 @@ class ProgramMenuKeyboard
         }
 
         $rows[] = [
-            ['text' => '⬅️ Back to Main Menu', 'callback_data' => 'back_main'],
+            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
         ];
 
         return ['inline_keyboard' => $rows];
@@ -33,8 +34,9 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of active courses for a programme.
      */
-    public static function courses(Program $program): array
+    public static function courses(Program $program, ?string $lang = 'en'): array
     {
+        $lang = $lang ?: 'en';
         $courseButtons = [];
         foreach ($program->courses as $course) {
             $codeSuffix = $course->course_code ? " [{$course->course_code}]" : '';
@@ -45,22 +47,54 @@ class ProgramMenuKeyboard
 
         if (empty($courseButtons)) {
             $courseButtons[] = [
-                ['text' => 'ℹ️ No courses registered yet', 'callback_data' => 'noop'],
+                ['text' => __('bot.courses.no_courses', [], $lang), 'callback_data' => 'noop'],
             ];
         }
 
         $courseButtons[] = [
-            ['text' => '⬅️ Back to Programmes', 'callback_data' => 'edu_files'],
+            ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
+        ];
+
+        $courseButtons[] = [
+            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
         ];
 
         return ['inline_keyboard' => $courseButtons];
     }
 
     /**
+     * Build inline keyboard of active courses for submitting materials.
+     */
+    public static function submitCourses(Program $program, ?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $buttons = [];
+        foreach ($program->courses as $course) {
+            $codeSuffix = $course->course_code ? " [{$course->course_code}]" : '';
+            $buttons[] = [
+                ['text' => "📤 {$course->name}{$codeSuffix}", 'callback_data' => "submit_res_{$course->id}"],
+            ];
+        }
+
+        if (empty($buttons)) {
+            $buttons[] = [
+                ['text' => __('bot.courses.no_courses', [], $lang), 'callback_data' => 'noop'],
+            ];
+        }
+
+        $buttons[] = [
+            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main'],
+        ];
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
      * Build inline keyboard of resource types for a course.
      */
-    public static function resourceTypes(Collection $resourceTypes, int $courseId, int $programId): array
+    public static function resourceTypes(Collection $resourceTypes, int $courseId, int $programId, ?string $lang = 'en'): array
     {
+        $lang = $lang ?: 'en';
         $buttons = [];
         foreach ($resourceTypes as $type) {
             $buttons[] = [
@@ -70,12 +104,12 @@ class ProgramMenuKeyboard
 
         if (empty($buttons)) {
             $buttons[] = [
-                ['text' => 'ℹ️ There is no resource for this', 'callback_data' => 'noop'],
+                ['text' => __('bot.courses.no_types', [], $lang), 'callback_data' => 'noop'],
             ];
         }
 
         $buttons[] = [
-            ['text' => '⬅️ Back to Courses', 'callback_data' => "prog_{$programId}"],
+            ['text' => __('bot.courses.back_courses', [], $lang), 'callback_data' => "prog_{$programId}"],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -84,28 +118,29 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of available resources.
      */
-    public static function resources(Collection $resources, int $courseId, int $programId): array
+    public static function resources(Collection $resources, int $courseId, int $programId, ?string $lang = 'en'): array
     {
+        $lang = $lang ?: 'en';
         $buttons = [];
         foreach ($resources as $resource) {
             $buttons[] = [
-                ['text' => "✅ {$resource->title}", 'callback_data' => "send_resource_{$resource->id}"],
+                ['text' => __("{$resource->title}"), 'callback_data' => "send_resource_{$resource->id}"],
             ];
         }
 
         if (empty($buttons)) {
             $buttons[] = [
-                ['text' => 'ℹ️ No materials uploaded for this yet', 'callback_data' => 'noop'],
+                ['text' => __('bot.courses.no_materials', [], $lang), 'callback_data' => 'noop'],
             ];
         }
 
         // Button allowing students to contribute files
         $buttons[] = [
-            ['text' => '📤 Submit a Material for this Course', 'callback_data' => "submit_res_{$courseId}"],
+            ['text' => __('bot.courses.submit_for_course', [], $lang), 'callback_data' => "submit_res_{$courseId}"],
         ];
 
         $buttons[] = [
-            ['text' => '⬅️ Back to Types', 'callback_data' => "course_{$courseId}_{$programId}"],
+            ['text' => __('bot.courses.back_types', [], $lang), 'callback_data' => "course_{$courseId}_{$programId}"],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -114,11 +149,14 @@ class ProgramMenuKeyboard
     /**
      * Single back to main menu inline keyboard.
      */
-    public static function backToMain(): array
+    public static function backToMain(?string $lang = 'en', ?string $section = null): array
     {
+        $lang = $lang ?: 'en';
+        $callbackData = $section ? "back_main_{$section}" : 'back_main';
+
         return [
             'inline_keyboard' => [
-                [['text' => '⬅️ Back to Main Menu', 'callback_data' => 'back_main']],
+                [['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => $callbackData]],
             ],
         ];
     }

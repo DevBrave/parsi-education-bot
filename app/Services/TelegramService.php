@@ -9,12 +9,13 @@ use Illuminate\Support\Facades\Log;
 class TelegramService
 {
     protected string $botToken;
+
     protected string $baseUrl;
 
     public function __construct()
     {
         $this->botToken = (string) config('telegram.bot_token');
-        $this->baseUrl = config('telegram.api_url') . $this->botToken;
+        $this->baseUrl = config('telegram.api_url').$this->botToken;
     }
 
     /**
@@ -45,7 +46,6 @@ class TelegramService
                 'response' => $response->json(),
             ]);
         }
-
 
         return $response;
     }
@@ -122,7 +122,6 @@ class TelegramService
         if ($text !== null) {
             $payload['text'] = $text;
         }
-        
 
         return Http::post("{$this->baseUrl}/answerCallbackQuery", $payload);
     }
@@ -145,6 +144,7 @@ class TelegramService
                 'chat_id' => $chatId,
                 'response' => $response->json(),
             ]);
+
             return null;
         }
 
@@ -175,7 +175,7 @@ class TelegramService
             $payload['caption'] = $caption;
             $payload['parse_mode'] = $parseMode;
         }
-        
+
         $response = Http::post("{$this->baseUrl}/sendDocument", $payload);
         if (! $response->json('ok')) {
             Log::error('Telegram sendDocument failed', [

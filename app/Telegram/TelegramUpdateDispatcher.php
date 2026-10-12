@@ -4,7 +4,9 @@ namespace App\Telegram;
 
 use App\Models\User;
 use App\Telegram\Handlers\CallbackQueryHandler;
+use App\Telegram\Handlers\FileUploadHandler;
 use App\Telegram\Handlers\MessageHandler;
+use App\Telegram\Middleware\CheckUserOnboarding;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 
@@ -12,7 +14,9 @@ class TelegramUpdateDispatcher
 {
     public function __construct(
         protected MessageHandler $messageHandler,
-        protected CallbackQueryHandler $callbackQueryHandler
+        protected CallbackQueryHandler $callbackQueryHandler,
+        protected CheckUserOnboarding $onboardingMiddleware,
+        protected FileUploadHandler $fileUploadHandler
     ) {}
 
     /**
@@ -20,7 +24,6 @@ class TelegramUpdateDispatcher
      */
     public function dispatch(array $payload): void
     {
-        
         $message = $payload['message'] ?? null;
         $callbackQuery = $payload['callback_query'] ?? null;
 
@@ -32,23 +35,33 @@ class TelegramUpdateDispatcher
 
         // 2. Resolve User safely (Read-first)
         $user = $this->resolveUser($from);
-        
-
 
         if (! $user) {
             return;
         }
+
         // 3. Early exit for blocked users (Zero DB write overhead)
         if ($user->is_blocked) {
-            Log::info("Blocked user attempted access: {$user->telegram_user_id }" . $user->is_blocked);
+            Log::info("Blocked user attempted access: {$user->telegram_user_id}");
 
             return;
         }
 
+        // 4. Intercept first-time users or users with incomplete onboarding
+        if ($this->onboardingMiddleware->handle($payload, $user)) {
+            return;
+        }
 
         // Handle text messages and commands
         if ($message && isset($message['text'])) {
             $this->messageHandler->handle($message, $user);
+
+            return;
+        }
+
+        // Handle incoming files and photos
+        if ($message && (isset($message['document']) || isset($message['photo']))) {
+            $this->fileUploadHandler->handle($message, $user);
 
             return;
         }
