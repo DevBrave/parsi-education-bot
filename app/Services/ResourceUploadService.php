@@ -32,6 +32,7 @@ class ResourceUploadService
         if (! file_exists($fullPath)) {
             Log::error("Resource file does not exist on disk: {$fullPath}");
             $resourceFile->resource?->delete();
+
             return false;
         }
 
@@ -47,24 +48,29 @@ class ResourceUploadService
 
             if (! $tgResult || empty($tgResult['file_id'])) {
                 Log::error("Failed to upload ResourceFile #{$resourceFile->id} to Telegram");
-                $resourceFile->resource?->delete();
+                $resourceFile->resource?->update(['status' => 'rejected']);
+
                 return false;
             }
 
-            // 2. Upload to Google Drive (essential backup)
+            // 2. Upload to Google Drive (optional backup)
             $driveFileId = null;
             if ($this->googleDriveService->isConfigured()) {
-                $driveFileId = $this->googleDriveService->uploadFile(
-                    filePath: $fullPath,
-                    filename: $resourceFile->original_filename,
-                    mimeType: $resourceFile->mime_type,
-                );
-            }
+                try {
+                    $courseName = $resourceFile->resource?->course?->name;
+                    $folderId = $courseName
+                        ? $this->googleDriveService->getOrCreateFolder($courseName)
+                        : null;
 
-            if (! $driveFileId) {
-                Log::error("Failed to upload ResourceFile #{$resourceFile->id} to Google Drive");
-                $resourceFile->resource?->delete();
-                return false;
+                    $driveFileId = $this->googleDriveService->uploadFile(
+                        filePath: $fullPath,
+                        filename: $resourceFile->original_filename,
+                        mimeType: $resourceFile->mime_type,
+                        folderId: $folderId,
+                    );
+                } catch (\Throwable $driveError) {
+                    Log::warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
+                }
             }
 
             // 3. Update ResourceFile with external IDs
@@ -84,7 +90,8 @@ class ResourceUploadService
             return true;
         } catch (\Throwable $e) {
             Log::error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
-            $resourceFile->resource?->delete();
+            $resourceFile->resource?->update(['status' => 'rejected']);
+
             return false;
         } finally {
             // 5. Always delete local temporary file after processing
@@ -96,8 +103,8 @@ class ResourceUploadService
      * Store the file locally and sync it to Telegram and Google Drive.
      * Returns an array with external file IDs on success, or null on failure.
      *
-     * @param  UploadedFile  $file     The uploaded file from the request.
-     * @param  string        $caption  Caption for the Telegram message.
+     * @param  UploadedFile  $file  The uploaded file from the request.
+     * @param  string  $caption  Caption for the Telegram message.
      * @return array{telegram_file_id: string, telegram_file_unique_id: ?string, drive_file_id: ?string}|null
      */
     public function upload(UploadedFile $file, string $caption = ''): ?array
@@ -150,16 +157,21 @@ class ResourceUploadService
     /**
      * Upload file to Google Drive.
      */
-    protected function uploadToGoogleDrive(UploadedFile $file, string $fullPath): ?string
+    protected function uploadToGoogleDrive(UploadedFile $file, string $fullPath, ?string $courseName = null): ?string
     {
         if (! $this->googleDriveService->isConfigured() || ! file_exists($fullPath)) {
             return null;
         }
 
+        $folderId = $courseName
+            ? $this->googleDriveService->getOrCreateFolder($courseName)
+            : null;
+
         return $this->googleDriveService->uploadFile(
             filePath: $fullPath,
             filename: $file->getClientOriginalName(),
             mimeType: $file->getClientMimeType(),
+            folderId: $folderId,
         );
     }
 }

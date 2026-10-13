@@ -5,6 +5,7 @@ namespace App\Services;
 use Google\Client as GoogleClient;
 use Google\Service\Drive as GoogleDrive;
 use Google\Service\Drive\DriveFile;
+use Google\Service\Drive\Permission;
 use Illuminate\Support\Facades\Log;
 
 class GoogleDriveService
@@ -59,6 +60,61 @@ class GoogleDriveService
     }
 
     /**
+     * Find or create a subfolder by name inside a parent folder.
+     * Useful for automatically organizing files by Course.
+     */
+    public function getOrCreateFolder(string $folderName, ?string $parentFolderId = null): ?string
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        $parent = $parentFolderId ?? $this->folderId;
+
+        try {
+            $cleanName = str_replace("'", "\\'", $folderName);
+            $query = "mimeType = 'application/vnd.google-apps.folder' and name = '{$cleanName}' and trashed = false";
+            if ($parent) {
+                $query .= " and '{$parent}' in parents";
+            }
+
+            $results = $this->driveService->files->listFiles([
+                'q' => $query,
+                'spaces' => 'drive',
+                'fields' => 'files(id, name)',
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
+                'pageSize' => 1,
+            ]);
+
+            $files = $results->getFiles();
+            if (! empty($files)) {
+                return $files[0]->getId();
+            }
+
+            $folderMetadata = new DriveFile([
+                'name' => $folderName,
+                'mimeType' => 'application/vnd.google-apps.folder',
+            ]);
+
+            if ($parent) {
+                $folderMetadata->setParents([$parent]);
+            }
+
+            $createdFolder = $this->driveService->files->create($folderMetadata, [
+                'fields' => 'id',
+                'supportsAllDrives' => true,
+            ]);
+
+            return $createdFolder->id;
+        } catch (\Throwable $e) {
+            Log::warning("Failed to get or create Google Drive folder '{$folderName}': ".$e->getMessage());
+
+            return $parent;
+        }
+    }
+
+    /**
      * Upload a file to Google Drive.
      * Returns the Google Drive file ID on success, or null on failure.
      */
@@ -92,6 +148,19 @@ class GoogleDriveService
                     'supportsAllDrives' => true,
                 ]
             );
+
+            // Grant direct read permission to anyone with the link so students can view/download
+            try {
+                $permission = new Permission([
+                    'type' => 'anyone',
+                    'role' => 'reader',
+                ]);
+                $this->driveService->permissions->create($uploadedFile->id, $permission, [
+                    'supportsAllDrives' => true,
+                ]);
+            } catch (\Throwable $permError) {
+                Log::warning('Could not set public view permission on Google Drive file: '.$permError->getMessage());
+            }
 
             return $uploadedFile->id;
         } catch (\Throwable $e) {
