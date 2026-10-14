@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Auth\TelegramGuard;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
@@ -37,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
 
         // In local dev, auto-login as the first admin user for convenience.
         if (app()->isLocal()) {
-            $admin = \App\Models\User::where('role', 'admin')->first();
+            $admin = User::where('role', 'admin')->first();
             if ($admin) {
                 Auth::login($admin);
             }

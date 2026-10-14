@@ -17,12 +17,11 @@ class IsAdmin
     public function handle(Request $request, Closure $next): Response
     {
         $user = Auth::user();
-        
-        if (!$user || $user->role !== 'admin') {
+
+        if (! $user || $user->role !== 'admin') {
             abort(403, 'Unauthorized. Admin access required.');
         }
 
         return $next($request);
     }
 }
-

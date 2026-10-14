@@ -1,7 +1,15 @@
 <?php
 
+use App\Http\Controllers\Admin\AcademicYearAdminController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\CourseAdminController;
+use App\Http\Controllers\Admin\ProgramAdminController;
 use App\Http\Controllers\Admin\ResourceAdminController;
+use App\Http\Controllers\Admin\ResourceTypeAdminController;
 use App\Http\Middleware\IsAdmin;
+use Google\Client;
+use Google\Service\Drive;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 
@@ -9,13 +17,49 @@ Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
-   
 });
 
+Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
+    // 0. Dashboard
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
-Route::middleware(IsAdmin::class)->prefix('admin')->group(function (){
-    Route::get('/resources/create',[ResourceAdminController::class,'create'])->name('admin.resources.create');
-    Route::post('/resources/store',[ResourceAdminController::class,'store'])->name('admin.resources.store');
+    // 1. Resources
+    Route::get('/resources', [ResourceAdminController::class, 'index'])->name('admin.resources.index');
+    Route::get('/resources/create', [ResourceAdminController::class, 'create'])->name('admin.resources.create');
+    Route::post('/resources', [ResourceAdminController::class, 'store'])->name('admin.resources.store');
+    Route::get('/resources/{resource}/edit', [ResourceAdminController::class, 'edit'])->name('admin.resources.edit');
+    Route::put('/resources/{resource}', [ResourceAdminController::class, 'update'])->name('admin.resources.update');
+    Route::delete('/resources/{resource}', [ResourceAdminController::class, 'destroy'])->name('admin.resources.destroy');
+
+    // 2. Academic Years
+    Route::get('/academic-years', [AcademicYearAdminController::class, 'index'])->name('admin.academic-years.index');
+    Route::post('/academic-years', [AcademicYearAdminController::class, 'store'])->name('admin.academic-years.store');
+    Route::get('/academic-years/{academicYear}/edit', [AcademicYearAdminController::class, 'edit'])->name('admin.academic-years.edit');
+    Route::put('/academic-years/{academicYear}', [AcademicYearAdminController::class, 'update'])->name('admin.academic-years.update');
+    Route::post('/academic-years/{academicYear}/current', [AcademicYearAdminController::class, 'setCurrent'])->name('admin.academic-years.current');
+    Route::delete('/academic-years/{academicYear}', [AcademicYearAdminController::class, 'destroy'])->name('admin.academic-years.destroy');
+
+    // 3. Programmes
+    Route::get('/programs', [ProgramAdminController::class, 'index'])->name('admin.programs.index');
+    Route::post('/programs', [ProgramAdminController::class, 'store'])->name('admin.programs.store');
+    Route::get('/programs/{program}/edit', [ProgramAdminController::class, 'edit'])->name('admin.programs.edit');
+    Route::put('/programs/{program}', [ProgramAdminController::class, 'update'])->name('admin.programs.update');
+    Route::delete('/programs/{program}', [ProgramAdminController::class, 'destroy'])->name('admin.programs.destroy');
+
+    // 4. Courses
+    Route::get('/courses', [CourseAdminController::class, 'index'])->name('admin.courses.index');
+    Route::post('/courses', [CourseAdminController::class, 'store'])->name('admin.courses.store');
+    Route::get('/courses/{course}/edit', [CourseAdminController::class, 'edit'])->name('admin.courses.edit');
+    Route::put('/courses/{course}', [CourseAdminController::class, 'update'])->name('admin.courses.update');
+    Route::delete('/courses/{course}', [CourseAdminController::class, 'destroy'])->name('admin.courses.destroy');
+
+    // 5. Resource Types
+    Route::get('/resource-types', [ResourceTypeAdminController::class, 'index'])->name('admin.resource-types.index');
+    Route::post('/resource-types', [ResourceTypeAdminController::class, 'store'])->name('admin.resource-types.store');
+    Route::get('/resource-types/{resourceType}/edit', [ResourceTypeAdminController::class, 'edit'])->name('admin.resource-types.edit');
+    Route::put('/resource-types/{resourceType}', [ResourceTypeAdminController::class, 'update'])->name('admin.resource-types.update');
+    Route::delete('/resource-types/{resourceType}', [ResourceTypeAdminController::class, 'destroy'])->name('admin.resource-types.destroy');
 });
 
 if (app()->isLocal()) {
@@ -40,24 +84,24 @@ if (app()->isLocal()) {
             return response('Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env first!', 400);
         }
 
-        $client = new \Google\Client();
+        $client = new Client;
         $client->setClientId($clientId);
         $client->setClientSecret($clientSecret);
         $client->setRedirectUri(url('/google/callback'));
-        $client->addScope(\Google\Service\Drive::DRIVE);
+        $client->addScope(Drive::DRIVE);
         $client->setAccessType('offline');
         $client->setPrompt('consent');
 
         return redirect()->away($client->createAuthUrl());
     });
 
-    Route::get('/google/callback', function (\Illuminate\Http\Request $request) {
+    Route::get('/google/callback', function (Request $request) {
         $code = $request->input('code');
         if (! $code) {
             return response('No authorization code received from Google.', 400);
         }
 
-        $client = new \Google\Client();
+        $client = new Client;
         $client->setClientId(config('google.client_id'));
         $client->setClientSecret(config('google.client_secret'));
         $client->setRedirectUri(url('/google/callback'));
@@ -74,9 +118,9 @@ if (app()->isLocal()) {
         if (file_exists($envPath)) {
             $env = file_get_contents($envPath);
             if (str_contains($env, 'GOOGLE_REFRESH_TOKEN=')) {
-                $env = preg_replace('/GOOGLE_REFRESH_TOKEN=.*/', 'GOOGLE_REFRESH_TOKEN=' . $refreshToken, $env);
+                $env = preg_replace('/GOOGLE_REFRESH_TOKEN=.*/', 'GOOGLE_REFRESH_TOKEN='.$refreshToken, $env);
             } else {
-                $env .= "\nGOOGLE_REFRESH_TOKEN=" . $refreshToken . "\n";
+                $env .= "\nGOOGLE_REFRESH_TOKEN=".$refreshToken."\n";
             }
             file_put_contents($envPath, $env);
         }
@@ -85,4 +129,4 @@ if (app()->isLocal()) {
     });
 }
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';
