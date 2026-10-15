@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'name',
     'course_code',
     'credits',
+    'year',
     'is_active',
 ])]
 class Course extends Model
@@ -30,6 +31,22 @@ class Course extends Model
         return [
             'is_active' => 'boolean',
             'credits' => 'float',
+            'year' => 'integer',
         ];
+    }
+
+    /**
+     * Get human-readable year label (e.g. 1st Year, 2nd Year, 3rd Year).
+     */
+    public function getYearLabelAttribute(): string
+    {
+        return match ($this->year) {
+            1 => '1st Year',
+            2 => '2nd Year',
+            3 => '3rd Year',
+            4 => '4th Year',
+            5 => '5th Year',
+            default => $this->year ? "Year {$this->year}" : 'General / Elective',
+        };
     }
 }

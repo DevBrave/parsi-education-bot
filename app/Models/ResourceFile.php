@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property string $mime_type
  * @property int $size_bytes
  * @property string $sha256
+ * @property string|null $local_path
  * @property string|null $drive_file_id
  * @property string|null $telegram_file_id
  * @property string|null $telegram_file_unique_id
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
     'mime_type',
     'size_bytes',
     'sha256',
+    'local_path',
     'drive_file_id',
     'telegram_file_id',
     'telegram_file_unique_id',

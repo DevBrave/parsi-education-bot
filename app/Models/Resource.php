@@ -58,4 +58,20 @@ class Resource extends Model
     {
         return $this->hasMany(ResourceFile::class);
     }
+
+    /**
+     * Determine if this resource was submitted by a community student.
+     */
+    public function isCommunitySubmission(): bool
+    {
+        return $this->submitted_by !== null && $this->submitter !== null && $this->submitter->role !== 'admin';
+    }
+
+    /**
+     * Determine if this resource is an official PARSI upload.
+     */
+    public function isOfficial(): bool
+    {
+        return ! $this->isCommunitySubmission();
+    }
 }

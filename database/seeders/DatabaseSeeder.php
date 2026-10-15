@@ -15,10 +15,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            ResourceTypeSeeder::class,   // 8 resource types
-            AcademicYearSeeder::class,   // 2025/26
-            CatalogueSeeder::class,      // 1 programme, 1 course, 1 professor
-            TestResourceSeeder::class,   // 1 approved resource + file
+            CompleteCatalogSeeder::class,
         ]);
     }
 }
