@@ -7,10 +7,12 @@ use App\Models\Program;
 use App\Models\Resource;
 use App\Models\ResourceType;
 use App\Models\User;
+use App\Services\ResourceModerationService;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use App\Telegram\Keyboards\OnboardingKeyboard;
 use App\Telegram\Keyboards\ProgramMenuKeyboard;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +21,8 @@ class CallbackQueryHandler
 {
     public function __construct(
         protected TelegramService $telegram,
-        protected MessageHandler $messageHandler
+        protected MessageHandler $messageHandler,
+        protected ResourceModerationService $moderationService
     ) {}
 
     /**
@@ -31,16 +34,32 @@ class CallbackQueryHandler
         $data = $callbackQuery['data'] ?? '';
         $lang = $user->preferred_language ?? 'en';
 
-        // Acknowledge the button press to remove the loading spinner
-        $this->telegram->answerCallbackQuery($callbackId);
-
         // Only message-backed inline menus can be edited by this bot.
         if (! isset($callbackQuery['message']['chat']['id'], $callbackQuery['message']['message_id'])) {
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
         $chatId = $callbackQuery['message']['chat']['id'];
         $messageId = $callbackQuery['message']['message_id'];
+
+        // Handle one-click Admin Moderation callbacks from the Admin Group
+        if (str_starts_with($data, 'admin_approve_')) {
+            $resourceId = (int) substr($data, strlen('admin_approve_'));
+            $this->handleAdminApprove($chatId, $messageId, $resourceId, $user, $callbackQuery);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'admin_reject_')) {
+            $resourceId = (int) substr($data, strlen('admin_reject_'));
+            $this->handleAdminReject($chatId, $messageId, $resourceId, $user, $callbackQuery);
+
+            return;
+        }
+
+        // Acknowledge the button press to remove the loading spinner for student menus
+        $this->telegram->answerCallbackQuery($callbackId);
 
         if ($data === 'back_main' || str_starts_with($data, 'back_main_')) {
             $sectionKey = str_starts_with($data, 'back_main_')
@@ -90,12 +109,16 @@ class CallbackQueryHandler
             }
         } elseif (str_starts_with($data, 'prog_')) {
             $this->handleSelectProgram($chatId, $messageId, (int) substr($data, 5), $user);
+        } elseif (str_starts_with($data, 'course_year_')) {
+            $this->handleSelectCourseYear($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'course_')) {
             $this->handleSelectCourse($chatId, $messageId, $data, $user);
-        } elseif (str_starts_with($data, 'resource_type_')) {
+        } elseif (str_starts_with($data, 'resource_type_') || str_starts_with($data, 'res_page_')) {
             $this->handleSelectResourceType($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'send_resource_')) {
             $this->handleSendResource($chatId, $data, $user);
+        } elseif (str_starts_with($data, 'submit_year_')) {
+            $this->handleSelectSubmitCourseYear($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'submit_res_')) {
             $this->handleSubmitResourcePrompt($chatId, $messageId, (int) substr($data, 11), $user);
         } elseif ($data === 'cancel_upload') {
@@ -114,13 +137,40 @@ class CallbackQueryHandler
         }
     }
 
+    protected function handleSelectSubmitCourseYear(int $chatId, int $messageId, string $data, User $user): void
+    {
+        // Format: submit_year_{programId}_{year}_{page}
+        $lang = $user->preferred_language ?? 'en';
+        $parts = explode('_', $data);
+        $programId = (int) ($parts[2] ?? 0);
+        $year = $parts[3] ?? 'all';
+        $page = (int) ($parts[4] ?? 1);
+
+        $program = Program::where('is_active', true)->find($programId);
+        if (! $program) {
+            return;
+        }
+
+        $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+        $text = __('bot.submit_material.choose_course', [
+            'program' => e($program->name) . $levelTag,
+        ], $lang);
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            $text,
+            ProgramMenuKeyboard::submitCourses($program, $lang, $year, $page, 8)
+        );
+    }
+
     protected function handleSubmitResourcePrompt(int $chatId, int $messageId, int $courseId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
         $course = Course::find($courseId);
         $courseName = $course ? e($course->name) : 'this course';
 
-        // Set user state in cache for 15 minutes
+        // Set user state in cache for 15 minutes (We check this in fileuploadhandler)
         Cache::put("user_upload_state:{$user->id}", [
             'course_id' => $courseId,
         ], now()->addMinutes(15));
@@ -140,9 +190,7 @@ class CallbackQueryHandler
     protected function handleSelectProgram(int $chatId, int $messageId, int $programId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
-        $program = Program::with(['courses' => function ($query) {
-            $query->where('is_active', true)->orderBy('name');
-        }])->where('is_active', true)->find($programId);
+        $program = Program::with('courses')->where('is_active', true)->find($programId);
 
         if ($program) {
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
@@ -154,13 +202,13 @@ class CallbackQueryHandler
                 $text .= __('bot.courses.saved_as_default', [], $lang);
             }
 
-            $text .= __('bot.courses.choose_course', ['program' => $programTitle], $lang);
+            $text .= __('bot.courses.choose_year', ['program' => $programTitle], $lang);
 
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
                 $text,
-                ProgramMenuKeyboard::courses($program, $lang)
+                ProgramMenuKeyboard::years($program, $lang)
             );
         } else {
             $this->telegram->editMessageText(
@@ -172,12 +220,44 @@ class CallbackQueryHandler
         }
     }
 
+    protected function handleSelectCourseYear(int $chatId, int $messageId, string $data, User $user): void
+    {
+        // Format: course_year_{programId}_{year}_{page}
+        $lang = $user->preferred_language ?? 'en';
+        $parts = explode('_', $data);
+        $programId = (int) ($parts[2] ?? 0);
+        $year = $parts[3] ?? 'all';
+        $page = (int) ($parts[4] ?? 1);
+
+        $program = Program::where('is_active', true)->find($programId);
+        if (! $program) {
+            return;
+        }
+
+        $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+        $yearLabel = $year === 'all'
+            ? __('bot.courses.year_all', [], $lang)
+            : (__('bot.courses.year_' . $year, [], $lang) ?: "Year {$year}");
+
+        $text = "🎓 <b>" . e($program->name) . "{$levelTag}</b> — <b>{$yearLabel}</b>\n\n" .
+            __('bot.courses.choose_course', ['program' => e($program->name)], $lang);
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            $text,
+            ProgramMenuKeyboard::courses($program, $lang, $year, $page, 8)
+        );
+    }
+
     protected function handleSelectCourse(int $chatId, int $messageId, string $data, User $user): void
     {
+        // Format: course_{courseId}_{programId}_{year}
         $lang = $user->preferred_language ?? 'en';
         $parts = explode('_', $data);
         $courseId = (int) ($parts[1] ?? 0);
         $programId = isset($parts[2]) ? (int) $parts[2] : null;
+        $year = $parts[3] ?? 'all';
 
         $course = Course::with('programs')->where('is_active', true)->find($courseId);
 
@@ -216,17 +296,22 @@ class CallbackQueryHandler
             $chatId,
             $messageId,
             __('bot.courses.choose_type', ['course' => e($course->name)], $lang),
-            ProgramMenuKeyboard::resourceTypes($resourceTypes, $course->id, $programId, $lang)
+            ProgramMenuKeyboard::resourceTypes($resourceTypes, $course->id, $programId, $lang, $year)
         );
     }
 
     protected function handleSelectResourceType(int $chatId, int $messageId, string $data, User $user): void
     {
+        // Format from resourceTypes: resource_type_{typeId}_{courseId}_{programId}_{year}_{page}
+        // Format from res_page: res_page_{typeId}_{courseId}_{programId}_{year}_{page}
         $lang = $user->preferred_language ?? 'en';
         $parts = explode('_', $data);
+
         $resourceTypeId = (int) ($parts[2] ?? 0);
         $courseId = (int) ($parts[3] ?? 0);
-        $programId = isset($parts[4]) ? (int) $parts[4] : null;
+        $programId = (int) ($parts[4] ?? 0);
+        $year = $parts[5] ?? 'all';
+        $page = (int) ($parts[6] ?? 1);
 
         $resources = Resource::with('files')
             ->where('course_id', $courseId)
@@ -239,7 +324,7 @@ class CallbackQueryHandler
             $chatId,
             $messageId,
             __('bot.courses.available_resources', [], $lang),
-            ProgramMenuKeyboard::resources($resources, $courseId, $programId ?? 0, $lang)
+            ProgramMenuKeyboard::resources($resources, $courseId, $programId, $lang, $resourceTypeId, $year, $page, 6)
         );
     }
 
@@ -368,4 +453,131 @@ class CallbackQueryHandler
 
         $this->telegram->sendMessage($chatId, $text, ['inline_keyboard' => $buttons]);
     }
+
+    /**
+     * Handle one-click resource approval from the Telegram Admin Group.
+     */
+    protected function handleAdminApprove(
+        int|string $chatId,
+        int $messageId,
+        int $resourceId,
+        User $user,
+        array $callbackQuery
+    ): void {
+        $callbackId = $callbackQuery['id'];
+        $adminChatId = config('telegram.admin_chat_id');
+
+        // Check permission: must be inside admin group or have admin role
+        $isAuthorized = ($chatId == $adminChatId) || ($user->role === 'admin');
+        if (! $isAuthorized) {
+            $this->telegram->answerCallbackQuery($callbackId, '⛔ You are not authorized to moderate this material.');
+
+            return;
+        }
+
+        $resource = Resource::with(['course', 'submitter', 'resourceType'])->find($resourceId);
+        if (! $resource) {
+            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
+
+            return;
+        }
+
+        if ($resource->status === 'approved') {
+            $this->telegram->answerCallbackQuery($callbackId, "ℹ️ Resource #{$resourceId} has already been approved.");
+
+            return;
+        }
+
+        $this->moderationService->approve($resource, $user);
+
+        // Update the message in Telegram group (media caption or plain text)
+        $reviewerTag = $user->username ? "@{$user->username}" : ($user->first_name ?? "Admin #{$user->id}");
+        $hasCaption = isset($callbackQuery['message']['caption']);
+        $originalContent = $hasCaption
+            ? $callbackQuery['message']['caption']
+            : ($callbackQuery['message']['text'] ?? '');
+
+        $cleanContent = preg_replace('/(\n\n.*⏳.*Status:.*)/i', '', $originalContent);
+        if (empty($cleanContent)) {
+            $cleanContent = $originalContent;
+        }
+
+        $newContent = $cleanContent . "\n\n✅ <b>APPROVED & PUBLISHED</b> by {$reviewerTag}\n📅 " . now()->format('Y-m-d H:i');
+
+        // Update buttons: remove Approve/Reject buttons
+        $updatedKeyboard = ['inline_keyboard' => []];
+        $appUrl = rtrim(config('app.url'), '/');
+        $host = parse_url($appUrl, PHP_URL_HOST);
+        if ($host && ! in_array(strtolower($host), ['localhost', '127.0.0.1'], true) && filter_var($appUrl, FILTER_VALIDATE_URL)) {
+            $updatedKeyboard['inline_keyboard'][] = [
+                ['text' => '🔎 View in Web Panel', 'url' => "{$appUrl}/admin/resources/{$resource->id}/edit"],
+            ];
+        }
+
+        if ($hasCaption) {
+            $this->telegram->editMessageCaption($chatId, $messageId, $newContent, $updatedKeyboard, 'HTML');
+        } else {
+            $this->telegram->editMessageText($chatId, $messageId, $newContent, $updatedKeyboard, 'HTML');
+        }
+
+        $this->telegram->answerCallbackQuery($callbackId, "✅ Material #{$resourceId} approved and published!");
+    }
+
+    /**
+     * Handle one-click resource rejection from the Telegram Admin Group.
+     */
+    protected function handleAdminReject(
+        int|string $chatId,
+        int $messageId,
+        int $resourceId,
+        User $user,
+        array $callbackQuery
+    ): void {
+        $callbackId = $callbackQuery['id'];
+        $adminChatId = config('telegram.admin_chat_id');
+
+        $isAuthorized = ($chatId == $adminChatId) || ($user->role === 'admin');
+        if (! $isAuthorized) {
+            $this->telegram->answerCallbackQuery($callbackId, '⛔ You are not authorized to moderate this material.');
+
+            return;
+        }
+
+        $resource = Resource::with(['course', 'submitter'])->find($resourceId);
+        if (! $resource) {
+            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
+
+            return;
+        }
+
+        if ($resource->status === 'rejected') {
+            $this->telegram->answerCallbackQuery($callbackId, "ℹ️ Resource #{$resourceId} has already been rejected.");
+
+            return;
+        }
+
+        $this->moderationService->reject($resource, $user);
+
+        $reviewerTag = $user->username ? "@{$user->username}" : ($user->first_name ?? "Admin #{$user->id}");
+        $hasCaption = isset($callbackQuery['message']['caption']);
+        $originalContent = $hasCaption
+            ? $callbackQuery['message']['caption']
+            : ($callbackQuery['message']['text'] ?? '');
+
+        $cleanContent = preg_replace('/(\n\n.*⏳.*Status:.*)/i', '', $originalContent);
+        if (empty($cleanContent)) {
+            $cleanContent = $originalContent;
+        }
+
+        $newContent = $cleanContent . "\n\n❌ <b>REJECTED</b> by {$reviewerTag}\n📅 " . now()->format('Y-m-d H:i');
+
+        if ($hasCaption) {
+            $this->telegram->editMessageCaption($chatId, $messageId, $newContent, ['inline_keyboard' => []], 'HTML');
+        } else {
+            $this->telegram->editMessageText($chatId, $messageId, $newContent, ['inline_keyboard' => []], 'HTML');
+        }
+
+        $this->telegram->answerCallbackQuery($callbackId, "❌ Material #{$resourceId} rejected.");
+    }
 }
+

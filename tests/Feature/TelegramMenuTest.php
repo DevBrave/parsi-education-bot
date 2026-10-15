@@ -21,7 +21,7 @@ class TelegramMenuTest extends TestCase
         ]);
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
-            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 Educational Files'
+            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 Study Resources'
             && $request['reply_markup']['is_persistent'] === true
             && $request['reply_markup']['one_time_keyboard'] === false
             && str_contains($request['text'], '&lt;Student&gt;'));
@@ -75,7 +75,7 @@ class TelegramMenuTest extends TestCase
         ]);
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
-            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 فایل‌های آموزشی'
+            && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 منابع درسی'
             && str_contains($request['text'], 'به ربات تلگرام انجمن پارسی خوش آمدید'));
     }
 

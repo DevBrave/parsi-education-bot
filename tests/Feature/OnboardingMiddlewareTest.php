@@ -132,7 +132,7 @@ class OnboardingMiddlewareTest extends TestCase
         Http::assertSent(function (Request $request) {
             return str_ends_with($request->url(), '/sendMessage')
                 && isset($request['reply_markup']['keyboard'])
-                && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 فایل‌های آموزشی';
+                && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 منابع درسی';
         });
     }
 

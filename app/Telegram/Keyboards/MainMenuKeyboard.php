@@ -14,7 +14,7 @@ class MainMenuKeyboard
         if ($lang === 'fa') {
             return [
                 'keyboard' => [
-                    [['text' => '📚 فایل‌های آموزشی'], ['text' => '🔍 ادیزو']],
+                    [['text' => '📚 منابع درسی'], ['text' => '🔍 ادیزو']],
                     [['text' => '📤 ارسال فایل درسی'], ['text' => '❓ ددلاین‌های مهم']],
                     [['text' => '⚙️ تنظیمات'], ['text' => '⚠️ ارتباط / گزارش']],
                 ],
@@ -39,7 +39,7 @@ class MainMenuKeyboard
 
         return [
             'keyboard' => [
-                [['text' => '📚 Educational Files'], ['text' => '🔍 Edisu']],
+                [['text' => '📚 Study Resources'], ['text' => '🔍 Edisu']],
                 [['text' => '📤 Submit Material'], ['text' => '❓ Important Deadlines']],
                 [['text' => '⚙️ Settings'], ['text' => '⚠️ Contact / Report']],
             ],

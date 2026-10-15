@@ -27,6 +27,15 @@ class TelegramUpdateDispatcher
         $message = $payload['message'] ?? null;
         $callbackQuery = $payload['callback_query'] ?? null;
 
+        // 1. Only process direct 1-on-1 private messages (or admin moderation callback queries)
+        $chatType = $message['chat']['type'] ?? ($callbackQuery['message']['chat']['type'] ?? 'private');
+        $callbackData = $callbackQuery['data'] ?? '';
+        $isAdminModerationCallback = str_starts_with($callbackData, 'admin_approve_') || str_starts_with($callbackData, 'admin_reject_');
+
+        if ($chatType !== 'private' && ! $isAdminModerationCallback) {
+            return;
+        }
+
         $from = $message['from'] ?? $callbackQuery['from'] ?? null;
 
         if (! $from || ! isset($from['id'])) {
@@ -43,6 +52,13 @@ class TelegramUpdateDispatcher
         // 3. Early exit for blocked users (Zero DB write overhead)
         if ($user->is_blocked) {
             Log::info("Blocked user attempted access: {$user->telegram_user_id}");
+
+            return;
+        }
+
+        // Direct dispatch for admin moderation callback queries (bypass student onboarding)
+        if ($isAdminModerationCallback && $callbackQuery) {
+            $this->callbackQueryHandler->handle($callbackQuery, $user);
 
             return;
         }

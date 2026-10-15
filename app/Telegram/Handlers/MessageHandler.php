@@ -32,7 +32,7 @@ class MessageHandler
                 __('bot.submit_material.cancelled', [], $lang),
                 MainMenuKeyboard::build($lang)
             );
-        } elseif (in_array($text, ['📚 Educational Files', '📚 فایل‌های آموزشی', '📚 Materiali Didattici'], true)) {
+        } elseif (in_array($text, ['📚 Study Resources', '📚 Educational Files', '📚 منابع درسی', '📚 فایل‌های آموزشی', '📚 Materiali Didattici'], true)) {
             $this->sendEducationalFiles($chatId, $user);
         } elseif (in_array($text, ['📤 Submit Material', '📤 ارسال فایل درسی', '📤 Invia Materiale'], true)) {
             $this->sendSubmitPrompt($chatId, $user);
@@ -163,19 +163,15 @@ class MessageHandler
         if ($user->program_id) {
             $program = $user->program;
             if ($program && $program->is_active) {
-                $program->load(['courses' => function ($query) {
-                    $query->where('is_active', true)->orderBy('name');
-                }]);
-
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_course', [
-                    'program' => e($program->name).$levelTag,
+                $text = __('bot.courses.choose_year', [
+                    'program' => e($program->name) . $levelTag,
                 ], $lang);
 
                 $this->telegram->sendMessage(
                     $chatId,
                     $text,
-                    ProgramMenuKeyboard::courses($program, $lang)
+                    ProgramMenuKeyboard::years($program, $lang)
                 );
 
                 return;

@@ -22,7 +22,7 @@ class TelegramService
      * Send a text message to a Telegram chat.
      */
     public function sendMessage(
-        int $chatId,
+        int|string $chatId,
         string $text,
         ?array $replyMarkup = null,
         string $parseMode = 'HTML'
@@ -79,7 +79,7 @@ class TelegramService
      * Edit an existing message's text and optional inline keyboard.
      */
     public function editMessageText(
-        int $chatId,
+        int|string $chatId,
         int $messageId,
         string $text,
         ?array $replyMarkup = null,
@@ -109,6 +109,42 @@ class TelegramService
 
         return $response;
     }
+
+    /**
+     * Edit an existing message caption (for documents, photos, media).
+     */
+    public function editMessageCaption(
+        int|string $chatId,
+        int $messageId,
+        string $caption,
+        ?array $replyMarkup = null,
+        string $parseMode = 'HTML'
+    ): Response {
+        $payload = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'caption' => $caption,
+            'parse_mode' => $parseMode,
+        ];
+
+        if ($replyMarkup !== null) {
+            $payload['reply_markup'] = $replyMarkup;
+        }
+
+        $response = Http::post("{$this->baseUrl}/editMessageCaption", $payload);
+
+        if ($response->failed()) {
+            Log::error('Telegram editMessageCaption failed', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+        }
+
+        return $response;
+    }
+
 
     /**
      * Acknowledge an inline button press (removes the loading spinner).
@@ -161,10 +197,11 @@ class TelegramService
      * Send an existing Telegram document by file_id with optional caption.
      */
     public function sendDocument(
-        int $chatId,
+        int|string $chatId,
         string $fileId,
         ?string $caption = null,
-        string $parseMode = 'HTML'
+        string $parseMode = 'HTML',
+        ?array $replyMarkup = null
     ): Response {
         $payload = [
             'chat_id' => $chatId,
@@ -174,6 +211,10 @@ class TelegramService
         if ($caption !== null) {
             $payload['caption'] = $caption;
             $payload['parse_mode'] = $parseMode;
+        }
+
+        if ($replyMarkup !== null) {
+            $payload['reply_markup'] = $replyMarkup;
         }
 
         $response = Http::post("{$this->baseUrl}/sendDocument", $payload);
@@ -187,8 +228,73 @@ class TelegramService
         return $response;
     }
 
+    /**
+     * Send an existing Telegram photo by file_id with optional caption.
+     */
+    public function sendPhoto(
+        int|string $chatId,
+        string $fileId,
+        ?string $caption = null,
+        string $parseMode = 'HTML',
+        ?array $replyMarkup = null
+    ): Response {
+        $payload = [
+            'chat_id' => $chatId,
+            'photo' => $fileId,
+        ];
+
+        if ($caption !== null) {
+            $payload['caption'] = $caption;
+            $payload['parse_mode'] = $parseMode;
+        }
+
+        if ($replyMarkup !== null) {
+            $payload['reply_markup'] = $replyMarkup;
+        }
+
+        $response = Http::post("{$this->baseUrl}/sendPhoto", $payload);
+        if (! $response->json('ok')) {
+            Log::error('Telegram sendPhoto failed', [
+                'chat_id' => $chatId,
+                'description' => $response->json('description'),
+            ]);
+        }
+
+        return $response;
+    }
+
     public function getMe(): Response
     {
         return Http::get("{$this->baseUrl}/getMe");
     }
+
+    /**
+     * Retrieve file metadata (including file_path) from Telegram.
+     */
+    public function getFile(string $fileId): ?array
+    {
+        $response = Http::post("{$this->baseUrl}/getFile", [
+            'file_id' => $fileId,
+        ]);
+
+        if ($response->json('ok')) {
+            return $response->json('result');
+        }
+
+        Log::error('Telegram getFile failed', [
+            'file_id' => $fileId,
+            'response' => $response->json(),
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Generate the direct download URL for a file using its Telegram file_path.
+     */
+    public function getFileDownloadUrl(string $filePath): string
+    {
+        return "https://api.telegram.org/file/bot{$this->botToken}/{$filePath}";
+    }
 }
+

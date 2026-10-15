@@ -36,7 +36,7 @@ return [
         'change_program_prompt' => "🔄 <b>Select Degree Programme</b>\n\nChoose a programme to switch to:",
     ],
     'sections' => [
-        'educational_files' => '📚 Educational Files',
+        'educational_files' => '📚 Study Resources',
         'settings' => '⚙️ Settings',
         'edisu' => '🔍 Edisu',
         'deadlines' => '❓ Important Deadlines',
@@ -49,7 +49,7 @@ return [
         'prompt' => "📤 <b>Contribute Study Material</b>\n\n"
             ."Help fellow PoliTo students by submitting past exams, lecture notes, summaries, or exercises!\n\n"
             ."To submit:\n"
-            ."1. Tap <b>📚 Educational Files</b>\n"
+            ."1. Tap <b>📚 Study Resources</b>\n"
             ."2. Choose your Degree & Course\n"
             ."3. Tap <b>📤 Submit Material for this Course</b>\n\n"
             .'The Education Committee admins will review, verify, and publish your material! 🎓',
@@ -66,11 +66,24 @@ return [
             ."Please tap <b>📤 Submit Material</b> and select a course before sending files.",
         'cancelled' => "❌ <b>Submission cancelled.</b>",
         'cancel' => '❌ Cancel',
-        'back_to_edu' => '⬅️ Back to Educational Files',
+        'back_to_edu' => '⬅️ Back to Study Resources',
+        'approved_notification' => "🎉 <b>Good news!</b>\n\nYour submitted material for <b>:course</b> has been approved by the Education Committee and is now published on the bot!\n\nThank you for supporting fellow PoliTo students! 🎓",
+        'rejected_notification' => "ℹ️ <b>Submission Update</b>\n\nYour submitted file for <b>:course</b> was reviewed by the Education Committee and could not be approved for publication at this time.\n\nThank you for your effort and support! 🤝",
     ],
     'courses' => [
         'choose_course' => "🎓 <b>:program</b>\n\nChoose a course to view materials:",
-        'choose_program' => "📚 <b>Educational Files</b>\n\nChoose your degree programme:",
+        'choose_program' => "📚 <b>Study Resources</b>\n\nChoose your degree programme:",
+        'choose_year' => "🎓 <b>:program</b>\n\nChoose your academic year to view courses:",
+        'year_1' => '1️⃣ 1st Year',
+        'year_2' => '2️⃣ 2nd Year',
+        'year_3' => '3️⃣ 3rd Year',
+        'year_4' => '4️⃣ 4th Year',
+        'year_5' => '5️⃣ 5th Year',
+        'year_all' => '📚 All Courses',
+        'change_year' => '📅 Change Year',
+        'prev_page' => '◀️ Prev',
+        'next_page' => 'Next ▶️',
+        'page_indicator' => 'Page :current/:total',
         'choose_type' => "🎓 <b>:course</b>\n\nChoose a type to view materials:",
         'saved_as_default' => "✅ <i>Saved as your default programme.</i>\n\n",
         'program_not_found' => 'Programme not found. Please choose another one:',
