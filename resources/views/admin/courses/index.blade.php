@@ -29,7 +29,18 @@
 
                 <div class="form-group">
                     <label for="credits">Credits (CFU)</label>
-                    <input type="number" id="credits" name="credits" placeholder="e.g. 6.0" step="0.5" min="1" max="30" value="{{ old('credits', '6.0') }}">
+                    <input type="number" id="credits" name="credits" placeholder="e.g. 6.0" step="1" min="1" max="30" value="{{ old('credits', '6.0') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="year">Academic Year *</label>
+                    <select id="year" name="year" required>
+                        <option value="1" {{ old('year', '1') == '1' ? 'selected' : '' }}>1st Year</option>
+                        <option value="2" {{ old('year') == '2' ? 'selected' : '' }}>2nd Year</option>
+                        <option value="3" {{ old('year') == '3' ? 'selected' : '' }}>3rd Year</option>
+                        <option value="4" {{ old('year') == '4' ? 'selected' : '' }}>4th Year</option>
+                        <option value="5" {{ old('year') == '5' ? 'selected' : '' }}>5th Year</option>
+                    </select>
                 </div>
 
                 <div class="form-group" style="grid-column: span 2;">
@@ -73,6 +84,7 @@
                     <tr>
                         <th>Code</th>
                         <th>Name</th>
+                        <th>Year</th>
                         <th>CFU</th>
                         <th>Programmes</th>
                         <th>Status</th>
@@ -87,6 +99,9 @@
                             </td>
                             <td>
                                 <strong>{{ $course->name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge badge-info">{{ $course->year_label }}</span>
                             </td>
                             <td>
                                 {{ $course->credits ? $course->credits . ' CFU' : '—' }}

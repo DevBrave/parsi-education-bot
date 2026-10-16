@@ -16,7 +16,70 @@
         </a>
     </div>
 
-    <!-- Attached File Info Card -->
+    <!-- Origin & Submitter Provenance Card -->
+    <div class="card" style="padding: 1.25rem; {{ $resource->isCommunitySubmission() ? 'background: #faf5ff; border: 1px solid #e9d5ff;' : 'background: #f0fdf4; border: 1px solid #bbf7d0;' }}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                    @if($resource->isCommunitySubmission())
+                        <span class="badge" style="background: #8b5cf6; color: #ffffff; font-weight: 600; font-size: 0.775rem;">
+                            👤 Community Submission
+                        </span>
+                        <span style="font-size: 0.8125rem; color: #6b21a8; font-weight: 500;">
+                            Submitted via Telegram Bot
+                        </span>
+                    @else
+                        <span class="badge" style="background: #10b981; color: #ffffff; font-weight: 600; font-size: 0.775rem;">
+                            🛡️ Official PARSI Material
+                        </span>
+                        <span style="font-size: 0.8125rem; color: #047857; font-weight: 500;">
+                            Uploaded by PARSI Team
+                        </span>
+                    @endif
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 0.65rem; font-size: 0.825rem; color: var(--text-main);">
+                    @if($resource->submitter)
+                        <div>
+                            <span style="color: var(--text-muted);">Contributor:</span>
+                            <strong>{{ $resource->submitter->first_name }} {{ $resource->submitter->last_name }}</strong>
+                            @if($resource->submitter->username)
+                                <a href="https://t.me/{{ $resource->submitter->username }}" target="_blank" style="color: var(--color-primary); text-decoration: none; margin-left: 0.25rem;">
+                                    {{ '@' . $resource->submitter->username }}
+                                </a>
+                            @endif
+                        </div>
+                        @if($resource->submitter->telegram_user_id)
+                            <div>
+                                <span style="color: var(--text-muted);">Telegram ID:</span>
+                                <code>{{ $resource->submitter->telegram_user_id }}</code>
+                            </div>
+                        @endif
+                    @else
+                        <div>
+                            <span style="color: var(--text-muted);">Source:</span>
+                            <strong>Direct Admin Upload</strong>
+                        </div>
+                    @endif
+
+                    <div>
+                        <span style="color: var(--text-muted);">Submitted:</span>
+                        <span>{{ $resource->created_at ? $resource->created_at->format('M d, Y H:i') . ' (' . $resource->created_at->diffForHumans() . ')' : '—' }}</span>
+                    </div>
+
+                    @if($resource->reviewer)
+                        <div>
+                            <span style="color: var(--text-muted);">Reviewed by:</span>
+                            <strong>{{ $resource->reviewer->first_name ?? $resource->reviewer->username }}</strong>
+                            @if($resource->reviewed_at)
+                                <span style="color: var(--text-muted);">({{ \Carbon\Carbon::parse($resource->reviewed_at)->format('M d, Y') }})</span>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
     @php
         $primaryFile = $resource->files->first();
     @endphp
@@ -30,6 +93,11 @@
                     </h3>
                     <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
                         Size: <strong>{{ $primaryFile->formatted_size }}</strong> &bull; Type: <code>{{ $primaryFile->mime_type }}</code>
+                    </div>
+                    <div style="margin-top: 0.75rem;">
+                        <a href="{{ route('admin.resources.download', [$resource, $primaryFile]) }}" target="_blank" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.9rem; font-size: 0.825rem; text-decoration: none;">
+                            📥 View / Download Document
+                        </a>
                     </div>
                 </div>
 
@@ -69,7 +137,7 @@
             </div>
         </div>
 
-        <form action="{{ route('admin.resources.update', $resource) }}" method="POST" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        <form action="{{ route('admin.resources.update', $resource) }}" method="POST" enctype="multipart/form-data" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
             @csrf
             @method('PUT')
 
@@ -165,6 +233,16 @@
                         Includes Answers / Solutions
                     </label>
                 </div>
+            </div>
+
+            <!-- Optional File Upload / Replace for Google Drive Sync -->
+            <div class="form-group" style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 1rem;">
+                <label for="file" style="font-weight: 600; color: var(--text-main);">Upload / Replace File (for Local Cache & Google Drive Sync)</label>
+                <input type="file" id="file" name="file" accept=".pdf,.zip,.docx,.pptx" style="margin-top: 0.35rem;">
+                <small style="display: block; color: var(--text-muted); margin-top: 0.35rem; font-size: 0.775rem;">
+                    💡 Use this if the original material was submitted via Telegram and exceeds 20MB, to upload it directly to Google Drive and local storage. Max 50MB.
+                </small>
+                @error('file') <span class="error-msg">{{ $message }}</span> @enderror
             </div>
 
             <!-- Form Actions -->

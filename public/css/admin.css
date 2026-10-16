@@ -186,6 +186,12 @@ body {
     color: #991b1b;
 }
 
+.alert-info {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}
+
 /* Cards */
 .card {
     background: var(--card);

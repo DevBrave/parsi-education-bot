@@ -379,7 +379,9 @@
                         @forelse($resourceStats['recent'] as $res)
                             <tr>
                                 <td>
-                                    <strong>{{ $res->title }}</strong>
+                                    <a href="{{ route('admin.resources.edit', $res) }}" style="text-decoration: none; color: inherit; font-weight: 600;" class="hover-underline">
+                                        {{ $res->title }}
+                                    </a>
                                     @if($res->has_solutions)
                                         <span title="Includes Solutions" style="font-size: 0.75rem;">💡</span>
                                     @endif
