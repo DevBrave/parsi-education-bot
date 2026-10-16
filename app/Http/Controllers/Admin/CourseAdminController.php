@@ -36,6 +36,7 @@ class CourseAdminController extends Controller
             'name' => ['required', 'string', 'max:200'],
             'course_code' => ['required', 'string', 'max:30', 'unique:courses,course_code'],
             'credits' => ['nullable', 'numeric', 'min:0', 'max:60'],
+            'year' => ['nullable', 'integer', 'min:1', 'max:6'],
             'program_ids' => ['nullable', 'array'],
             'program_ids.*' => ['exists:programs,id'],
             'is_active' => ['nullable', 'boolean'],
@@ -45,6 +46,7 @@ class CourseAdminController extends Controller
             'name' => $validated['name'],
             'course_code' => strtoupper(trim($validated['course_code'])),
             'credits' => $validated['credits'] ?? null,
+            'year' => $validated['year'] ?? 1,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -79,6 +81,7 @@ class CourseAdminController extends Controller
             'name' => ['required', 'string', 'max:200'],
             'course_code' => ['required', 'string', 'max:30', Rule::unique('courses', 'course_code')->ignore($course->id)],
             'credits' => ['nullable', 'numeric', 'min:0', 'max:60'],
+            'year' => ['nullable', 'integer', 'min:1', 'max:6'],
             'program_ids' => ['nullable', 'array'],
             'program_ids.*' => ['exists:programs,id'],
             'is_active' => ['nullable', 'boolean'],
@@ -88,6 +91,7 @@ class CourseAdminController extends Controller
             'name' => $validated['name'],
             'course_code' => strtoupper(trim($validated['course_code'])),
             'credits' => $validated['credits'] ?? null,
+            'year' => $validated['year'] ?? 1,
             'is_active' => $request->boolean('is_active'),
         ]);
 

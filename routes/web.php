@@ -30,6 +30,7 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::post('/resources', [ResourceAdminController::class, 'store'])->name('admin.resources.store');
     Route::get('/resources/{resource}/edit', [ResourceAdminController::class, 'edit'])->name('admin.resources.edit');
     Route::put('/resources/{resource}', [ResourceAdminController::class, 'update'])->name('admin.resources.update');
+    Route::get('/resources/{resource}/files/{file}/download', [ResourceAdminController::class, 'downloadFile'])->name('admin.resources.download');
     Route::delete('/resources/{resource}', [ResourceAdminController::class, 'destroy'])->name('admin.resources.destroy');
 
     // 2. Academic Years

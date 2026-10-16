@@ -91,11 +91,10 @@ class ResourceUploadService
         } catch (\Throwable $e) {
             Log::error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
             $resourceFile->resource?->update(['status' => 'rejected']);
+            // Clean up temporary local file on failure
+            Storage::disk('local')->delete($storedPath);
 
             return false;
-        } finally {
-            // 5. Always delete local temporary file after processing
-            Storage::disk('local')->delete($storedPath);
         }
     }
 

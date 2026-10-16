@@ -28,10 +28,15 @@ class GoogleDriveService
                 $client = new GoogleClient;
                 $client->setClientId($clientId);
                 $client->setClientSecret($clientSecret);
-                $client->refreshToken($refreshToken);
-                $this->driveService = new GoogleDrive($client);
+                $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
 
-                return;
+                if (! empty($token['error'])) {
+                    Log::warning('Google Drive refresh token invalid or expired: ' . ($token['error_description'] ?? $token['error']));
+                } else {
+                    $this->driveService = new GoogleDrive($client);
+
+                    return;
+                }
             } catch (\Throwable $e) {
                 Log::error('Failed to initialize Google Drive OAuth client: '.$e->getMessage());
             }
