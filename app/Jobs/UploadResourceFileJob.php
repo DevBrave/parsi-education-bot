@@ -49,7 +49,12 @@ class UploadResourceFileJob implements ShouldQueue
         // Clean up temporary local file
         Storage::disk('local')->delete($this->storedPath);
 
-        // Delete unapproved resource to prevent orphan records and free sha256
-        $this->resourceFile->resource?->delete();
+        // Delete file and clean up resource only if it has no other files
+        $resource = $this->resourceFile->resource;
+        $this->resourceFile->delete();
+
+        if ($resource && $resource->files()->count() === 0) {
+            $resource->delete();
+        }
     }
 }

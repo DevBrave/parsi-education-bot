@@ -2,25 +2,21 @@
 
 namespace App\Telegram\Handlers;
 
+use App\Jobs\FinalizeSubmissionJob;
 use App\Models\Course;
 use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\ResourceType;
 use App\Models\User;
-use App\Services\GoogleDriveService;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class FileUploadHandler
 {
     public function __construct(
-        protected TelegramService $telegram,
-        protected GoogleDriveService $driveService
+        protected TelegramService $telegram
     ) {}
 
     /**
@@ -59,42 +55,87 @@ class FileUploadHandler
             return;
         }
 
+        if(! isset($state['title'])){
+
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.submit_material.choose_title', [], $lang),
+                MainMenuKeyboard::build($lang)
+            );
+
+            return;
+        }
+
         // 1. Extract file info
         $fileData = $this->extractFileInfo($message);
         if (! $fileData) {
             return;
         }
 
-        // 2. Resolve default resource type (notes or first available)
-        $resourceType = ResourceType::where('code', 'notes')->first()
-            ?? ResourceType::first();
-
-        if (! $resourceType) {
-            $resourceType = ResourceType::create([
-                'code' => 'notes',
-                'display_name' => 'Notes & Summaries',
-                'sort_order' => 1,
-            ]);
-        }
-
-        // 3. Extract title and description
+        // 2. Check if a Resource has already been started in this upload session
         $caption = isset($message['caption']) ? trim($message['caption']) : null;
-        $title = $caption ? mb_substr($caption, 0, 255) : pathinfo($fileData['original_filename'], PATHINFO_FILENAME);
-        if (empty($title)) {
-            $title = $course->name . ' Material';
+        if (! empty($caption)) {
+            $state['caption'] = $caption;
+        } elseif (! empty($state['caption'])) {
+            $caption = $state['caption'];
+        }
+        $resource = null;
+        if (! empty($state['resource_id'])) {
+            $resource = Resource::with('files')->find($state['resource_id']);
         }
 
-        // 4. Create Resource record
-        $resource = Resource::create([
-            'course_id' => $course->id,
-            'resource_type_id' => $resourceType->id,
-            'title' => $title,
-            'description' => $caption,
-            'status' => 'pending',
-            'submitted_by' => $user->id,
-        ]);
+        if (! $resource) {
+            // First file: resolve category and create Resource record
+            $resourceType = null;
+            if (! empty($state['resource_type_id'])) {
+                $resourceType = ResourceType::where('is_active', true)->find($state['resource_type_id']);
+            }
 
-        // 5. Create ResourceFile record
+            if (! $resourceType) {
+                $resourceType = ResourceType::where('code', 'notes')->first()
+                    ?? ResourceType::where('is_active', true)->first()
+                    ?? ResourceType::first();
+            }
+
+            if (! $resourceType) {
+                $resourceType = ResourceType::create([
+                    'code' => 'notes',
+                    'display_name' => 'Notes & Summaries',
+                    'sort_order' => 1,
+                ]);
+            }
+
+            $title = ! empty($state['title'])
+                ? $state['title']
+                : ($course->name . ' Material');
+
+            $description = ! empty($caption) ? $caption : null;
+
+            $resource = Resource::create([
+                'course_id' => $course->id,
+                'resource_type_id' => $resourceType->id,
+                'title' => $title,
+                'description' => $description,
+                'status' => 'pending',
+                'submitted_by' => $user->id,
+            ]);
+
+            $state['resource_id'] = $resource->id;
+
+            // Schedule delayed finalize job in case user closes Telegram or forgets to tap Done
+            FinalizeSubmissionJob::dispatch($user->id, $resource->id, $chatId)
+                ->delay(now()->addMinutes(3));
+        } else {
+            // If resource was already created (e.g. earlier file in an album had no caption)
+            // and this message brings the album's caption, update the resource description only:
+            if (! empty($caption) && empty($resource->description)) {
+                $resource->update([
+                    'description' => $caption,
+                ]);
+            }
+        }
+
+        // 3. Create ResourceFile record and attach to this Resource
         ResourceFile::create([
             'resource_id' => $resource->id,
             'original_filename' => $fileData['original_filename'],
@@ -105,45 +146,78 @@ class FileUploadHandler
             'telegram_file_unique_id' => $fileData['telegram_file_unique_id'],
         ]);
 
+        $totalFiles = $resource->files()->count();
+        $filename = e($fileData['original_filename']);
 
-        // 6. Clear upload state
-        Cache::forget($stateKey);
+        $messageText = __('bot.submit_material.file_received', [
+            'filename' => $filename,
+            'count' => $totalFiles,
+        ], $lang);
 
-        Log::info("User {$user->id} submitted material for course {$course->id}", [
-            'resource_id' => $resource->id,
-            'filename' => $fileData['original_filename'],
-        ]);
-         // 7. Notify Admins Group
-        $this->notifyAdmins($resource, $course, $resourceType, $user, $fileData,$caption);
+        $replyMarkup = [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.submit_material.finish_button', ['count' => $totalFiles], $lang), 'callback_data' => 'finish_upload'],
+                ],
+                [
+                    ['text' => __('bot.submit_material.cancel', [], $lang), 'callback_data' => 'cancel_upload'],
+                ],
+            ],
+        ];
 
-        // 8. Send confirmation to user
-        $courseName = e($course->name);
-        $this->telegram->sendMessage(
-            $chatId,
-            __('bot.submit_material.success', ['course' => $courseName], $lang),
-            MainMenuKeyboard::build($lang)
-        );
+        // Edit the existing confirmation message if one was already sent in this session,
+        // otherwise send a new confirmation message and store its ID in session state.
+        $feedbackMsgId = $state['feedback_message_id'] ?? null;
+        $edited = false;
 
-       
+        if ($feedbackMsgId) {
+            try {
+                $editResponse = $this->telegram->editMessageText($chatId, $feedbackMsgId, $messageText, $replyMarkup);
+                $edited = $editResponse->successful();
+            } catch (\Throwable $e) {
+                $edited = false;
+            }
+        }
+
+        if (! $edited) {
+            $sendResponse = $this->telegram->sendMessage($chatId, $messageText, $replyMarkup);
+            $newMsgId = $sendResponse->json('result.message_id');
+            if ($newMsgId) {
+                $state['feedback_message_id'] = $newMsgId;
+            }
+        }
+
+        // Keep upload state active for another 5 minutes
+        Cache::put($stateKey, $state, now()->addMinutes(5));
     }
 
     /**
-     * Notify the Admins Telegram group of a new pending submission.
+     * Notify the Admins Telegram group of a pending submission with all attached files.
      */
-    protected function notifyAdmins(
-        Resource $resource,
-        Course $course,
-        ResourceType $resourceType,
-        User $user,
-        array $fileData,
-        ?string $caption = null
-    ): void {
+    public function notifyAdminsForResource(Resource $resource, User $user): void
+    {
+        // Prevent duplicate admin notifications for the same resource
+        $notifiedKey = "resource_admin_notified:{$resource->id}";
+        if (Cache::has($notifiedKey)) {
+            return;
+        }
+        Cache::put($notifiedKey, true, now()->addHours(24));
+
         $adminChatId = config('telegram.admin_chat_id');
         if (empty($adminChatId)) {
             return;
         }
 
-        $sizeFormatted = $this->formatBytes($fileData['size_bytes']);
+        $course = $resource->course;
+        $resourceType = $resource->resourceType;
+        $files = $resource->files;
+
+        $fileLines = [];
+        foreach ($files as $file) {
+            $fileLines[] = "• " . e($file->original_filename) . " (" . $file->formatted_size . ")";
+        }
+        $fileList = implode("\n", $fileLines);
+
         $submitterInfo = $user->username
             ? "@{$user->username}"
             : "ID: {$user->telegram_user_id} (" . trim("{$user->first_name} {$user->last_name}") . ")";
@@ -169,53 +243,53 @@ class FileUploadHandler
         $replyMarkup = ['inline_keyboard' => $inlineRows];
 
         $message = "📥 <b>New Material Uploaded (Pending Review)</b>\n\n"
-            . "📚 <b>Course:</b> " . e($course->name) . "\n"
-            . "📄 <b>File:</b> " . e($fileData['original_filename']) . " ({$sizeFormatted})\n"
+            . "📚 <b>Course:</b> " . e($course?->name ?? 'Unknown') . "\n"
+            . "📝 <b>Title:</b> " . e($resource->title) . "\n"
+            . "📁 <b>Attached Files (" . $files->count() . "):</b>\n" . $fileList . "\n\n"
             . "👤 <b>Submitted by:</b> " . e($submitterInfo) . "\n"
-            . "🏷 <b>Category:</b> " . e($resourceType->display_name) . "\n"
+            . "🏷 <b>Category:</b> " . e($resourceType?->display_name ?? 'General') . "\n"
             . "⏳ <b>Status:</b> <code>pending review</code>\n"
             . "🆔 <b>Resource ID:</b> <code>#{$resource->id}</code>"
-            . ($caption === null || $caption === ''
-                ? "\n\n⚠️ <i>Please add a caption from admin panel</i>"
-                : "\n\n📝 <b>Caption:</b> " . e($caption));
+            . ($resource->description ? "\n\n💬 <b>Description:</b> " . e($resource->description) : "");
 
         if (! $isValidExternalUrl) {
             $message .= "\n\n🔗 <b>Review Link:</b> <code>{$reviewUrl}</code>";
         }
 
+        $primaryFile = $files->first();
         try {
-            if (! empty($fileData['telegram_file_id'])) {
-                $isPhoto = str_starts_with($fileData['mime_type'] ?? '', 'image/');
-
+            if ($primaryFile && ! empty($primaryFile->telegram_file_id)) {
+                $isPhoto = str_starts_with($primaryFile->mime_type ?? '', 'image/');
                 $response = $isPhoto
-                    ? $this->telegram->sendPhoto(
-                        $adminChatId,
-                        $fileData['telegram_file_id'],
-                        $message,
-                        'HTML',
-                        $replyMarkup
-                    )
-                    : $this->telegram->sendDocument(
-                        $adminChatId,
-                        $fileData['telegram_file_id'],
-                        $message,
-                        'HTML',
-                        $replyMarkup
-                    );
+                    ? $this->telegram->sendPhoto($adminChatId, $primaryFile->telegram_file_id, $message, 'HTML', $replyMarkup)
+                    : $this->telegram->sendDocument($adminChatId, $primaryFile->telegram_file_id, $message, 'HTML', $replyMarkup);
 
                 if (! $response->json('ok')) {
-                    // Fallback to text message if media dispatch failed
                     $this->telegram->sendMessage($adminChatId, $message, $replyMarkup, 'HTML');
                 }
             } else {
                 $this->telegram->sendMessage($adminChatId, $message, $replyMarkup, 'HTML');
             }
         } catch (\Throwable $e) {
-            Log::warning('Failed to send admin notification for uploaded file', [
+            Log::warning('Failed to send admin notification for uploaded resource', [
                 'error' => $e->getMessage(),
                 'resource_id' => $resource->id,
             ]);
         }
+    }
+
+    /**
+     * Legacy helper to notify admins.
+     */
+    protected function notifyAdmins(
+        Resource $resource,
+        Course $course,
+        ResourceType $resourceType,
+        User $user,
+        array $fileData,
+        ?string $caption = null
+    ): void {
+        $this->notifyAdminsForResource($resource, $user);
     }
 
     /**
@@ -264,63 +338,6 @@ class FileUploadHandler
         return null;
     }
 
-    /**
-     * Automatically download the file from Telegram and sync it to Google Drive if configured.
-     * Note: Telegram Bot API limits getFile to 20MB.
-     */
-    protected function syncToDriveIfPossible(ResourceFile $file, Course $course, ResourceType $resourceType): void
-    {
-        if (! $this->driveService->isConfigured()) {
-            return;
-        }
 
-        // Telegram Bot API getFile limit is 20MB
-        if ($file->size_bytes > 20 * 1024 * 1024) {
-            Log::info("File #{$file->id} ({$file->formatted_size}) exceeds Telegram's 20MB getFile limit. Drive auto-sync skipped.");
-
-            return;
-        }
-
-        try {
-            $telegramFile = $this->telegram->getFile($file->telegram_file_id);
-            if (! $telegramFile || empty($telegramFile['file_path'])) {
-                return;
-            }
-
-            $downloadUrl = $this->telegram->getFileDownloadUrl($telegramFile['file_path']);
-            $response = Http::timeout(60)->get($downloadUrl);
-
-            if (! $response->successful()) {
-                return;
-            }
-
-            // Save locally in resources directory
-            $ext = pathinfo($file->original_filename, PATHINFO_EXTENSION) ?: 'bin';
-            $storedPath = 'resources/' . Str::random(40) . '.' . $ext;
-            Storage::disk('local')->put($storedPath, $response->body());
-
-            $fullPath = Storage::disk('local')->path($storedPath);
-
-            $courseFolderId = $this->driveService->getOrCreateFolder($course->name);
-            $typeFolderId = $this->driveService->getOrCreateFolder($resourceType->display_name, $courseFolderId);
-
-            $driveFileId = $this->driveService->uploadFile(
-                filePath: $fullPath,
-                filename: $file->original_filename,
-                mimeType: $file->mime_type,
-                folderId: $typeFolderId,
-            );
-
-            if ($driveFileId) {
-                $file->update([
-                    'local_path' => $storedPath,
-                    'drive_file_id' => $driveFileId,
-                ]);
-                Log::info("File #{$file->id} successfully synced to Google Drive with ID: {$driveFileId}");
-            }
-        } catch (\Throwable $e) {
-            Log::warning("Drive auto-sync on upload for file #{$file->id} failed: " . $e->getMessage());
-        }
-    }
 }
 

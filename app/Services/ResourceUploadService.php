@@ -22,7 +22,7 @@ class ResourceUploadService
      * Process background upload for an already stored file and update database records.
      * Called by UploadResourceFileJob.
      */
-    public function sync(ResourceFile $resourceFile, string $storedPath, string $caption = ''): bool
+    public function sync(ResourceFile $resourceFile, string $storedPath, ?string $caption = null): bool
     {
         // Allow up to 10 minutes for slow network transfers
         set_time_limit(600);
@@ -37,13 +37,35 @@ class ResourceUploadService
         }
 
         try {
-            // 1. Upload to Telegram storage channel
             $storageChannelId = config('telegram.storage_channel_id');
+            $courseName = $resourceFile->resource?->course?->name ?? 'Course Material';
+            $categoryName = $resourceFile->resource?->resourceType?->display_name ?? 'Material';
+            $title = $caption ?: ($resourceFile->resource?->title ?? '');
+            $cleanTitle = trim(preg_replace('/^📚\s*/u', '', $title));
+
+            $submitter = $resourceFile->resource?->submitter;
+            $submitterName = $submitter?->username
+                ? "@{$submitter->username}"
+                : trim("{$submitter?->first_name} {$submitter?->last_name}");
+            if (empty($submitterName) && $submitter?->telegram_user_id) {
+                $submitterName = "ID: {$submitter->telegram_user_id}";
+            }
+
+            $formattedCaption = "📚 <b>" . e($courseName) . "</b>";
+            if (! empty($cleanTitle)) {
+                $formattedCaption .= "\n📌 <b>" . e($cleanTitle) . "</b>";
+            }
+            $formattedCaption .= "\n📄 " . e($resourceFile->original_filename);
+            $formattedCaption .= "\n🏷️ <b>Category:</b> " . e($categoryName);
+            if (! empty($submitterName)) {
+                $formattedCaption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
+            }
+
             $tgResult = $this->telegramService->uploadDocument(
                 chatId: $storageChannelId,
                 filePath: $fullPath,
                 filename: $resourceFile->original_filename,
-                caption: $caption,
+                caption: $formattedCaption,
             );
 
             if (! $tgResult || empty($tgResult['file_id'])) {
@@ -53,9 +75,11 @@ class ResourceUploadService
                 return false;
             }
 
-            // 2. Upload to Google Drive (optional backup)
-            $driveFileId = null;
-            if ($this->googleDriveService->isConfigured()) {
+            // 2. Upload to Google Drive (only if approved and not already synced)
+            $isApproved = ($resourceFile->resource?->status === 'approved');
+            $driveFileId = $resourceFile->drive_file_id;
+
+            if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
                 try {
                     $courseName = $resourceFile->resource?->course?->name;
                     $folderId = $courseName
@@ -73,19 +97,19 @@ class ResourceUploadService
                 }
             }
 
-            // 3. Update ResourceFile with external IDs
+            // 3. Update ResourceFile with external IDs and clear local path
             $resourceFile->update([
                 'telegram_file_id' => $tgResult['file_id'],
                 'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
+                'telegram_message_id' => $tgResult['message_id'] ?? null,
                 'drive_file_id' => $driveFileId,
+                'local_path' => null,
             ]);
 
-            // 4. Mark Resource as approved so students can now see and download it
-            $resourceFile->resource?->update([
-                'status' => 'approved',
-            ]);
+            // 4. Remove temporary file from local VPS disk to conserve storage
+            Storage::disk('local')->delete($storedPath);
 
-            Log::info("Resource #{$resourceFile->resource_id} successfully synced to Telegram and approved.");
+            Log::info("Resource #{$resourceFile->resource_id} successfully synced to Telegram" . ($driveFileId ? " and Google Drive" : " (pending Drive sync on approval)") . ".");
 
             return true;
         } catch (\Throwable $e) {
