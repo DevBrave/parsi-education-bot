@@ -54,11 +54,46 @@
                     🏷️ Resource Types
                 </a>
             </li>
-             <li>
+            <li>
                 <a href="{{ route('admin.resources.index') }}" class="nav-link {{ request()->routeIs('admin.resources.*') ? 'active' : '' }}">
                     📚 Resources
                 </a>
             </li>
+            @if(Auth::check() && Auth::user()->canViewReports())
+                <li>
+                    <a href="{{ route('admin.reports.index') }}" class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" style="position: relative;">
+                        ⚠️ Reports
+                        @php
+                            $pendingReportsCount = \App\Models\ResourceReport::forUser(Auth::user())->pending()->count();
+                        @endphp
+                        @if($pendingReportsCount > 0)
+                            <span style="background: #ef4444; color: white; border-radius: 9999px; padding: 0.1rem 0.45rem; font-size: 0.7rem; font-weight: 700; margin-left: 0.25rem;">
+                                {{ $pendingReportsCount }}
+                            </span>
+                        @endif
+                    </a>
+                </li>
+            @endif
+            @if(Auth::check() && Auth::user()->canManageUsers())
+                <li>
+                    <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                        👥 Users & Roles
+                    </a>
+                </li>
+            @endif
+            @if(Auth::check())
+                <li style="margin-left: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.775rem; font-weight: 600; color: var(--text-main); background: var(--bg); padding: 0.35rem 0.65rem; border-radius: 6px; border: 1px solid var(--border);" title="Role: {{ Auth::user()->role_label }}">
+                        👤 {{ Auth::user()->first_name }} <span style="font-size: 0.7rem; color: #4f46e5; font-weight: 700; margin-left: 0.25rem;">[{{ Auth::user()->role_label }}]</span>
+                    </span>
+                    <form action="{{ route('admin.logout') }}" method="POST" style="display: inline;">
+                        @csrf
+                        <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: 6px;">
+                            🚪 Logout
+                        </button>
+                    </form>
+                </li>
+            @endif
         </ul>
     </nav>
 

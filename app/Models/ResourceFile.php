@@ -31,12 +31,18 @@ use Illuminate\Support\Carbon;
     'drive_file_id',
     'telegram_file_id',
     'telegram_file_unique_id',
+    'telegram_message_id',
 ])]
 class ResourceFile extends Model
 {
     public function resource(): BelongsTo
     {
         return $this->belongsTo(Resource::class);
+    }
+
+    public function reports(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ResourceReport::class, 'resource_file_id');
     }
 
     public function getFormattedSizeAttribute(): string

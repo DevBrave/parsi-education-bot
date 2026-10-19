@@ -28,6 +28,10 @@ class ProgramAdminController extends Controller
      */
     public function store(Request $request)
     {
+        if ($request->user() && ! $request->user()->canManageCatalog()) {
+            abort(403, 'Unauthorized. Only Admins and Editors can modify degree programmes.');
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -69,6 +73,10 @@ class ProgramAdminController extends Controller
      */
     public function update(Request $request, Program $program)
     {
+        if ($request->user() && ! $request->user()->canManageCatalog()) {
+            abort(403, 'Unauthorized. Only Admins and Editors can modify degree programmes.');
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -102,6 +110,10 @@ class ProgramAdminController extends Controller
      */
     public function destroy(Program $program)
     {
+        if (request()->user() && ! request()->user()->canManageCatalog()) {
+            abort(403, 'Unauthorized. Only Admins and Editors can delete degree programmes.');
+        }
+
         if ($program->courses()->exists()) {
             return back()->withErrors([
                 'delete' => "Cannot delete '{$program->name}' because it is linked to {$program->courses()->count()} course(s).",

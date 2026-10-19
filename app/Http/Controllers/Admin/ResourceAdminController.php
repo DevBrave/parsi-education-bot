@@ -91,7 +91,14 @@ class ResourceAdminController extends Controller
             'pending' => Resource::where('status', 'pending')->count(),
         ];
 
-        $courses = Course::where('is_active', true)->orderBy('name')->get();
+        $courseQuery = Course::where('is_active', true)->orderBy('name');
+        $user = $request->user();
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $courseQuery->whereHas('programs', function ($q) use ($user) {
+                $q->where('programs.id', $user->program_id);
+            });
+        }
+        $courses = $courseQuery->get();
         $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
         $academicYears = AcademicYear::all();
 
@@ -109,7 +116,18 @@ class ResourceAdminController extends Controller
      */
     public function create(Request $request)
     {
-        $courses = Course::where('is_active', true)->orderBy('name')->get();
+        $user = $request->user();
+        if ($user && ! $user->canCreateResources()) {
+            abort(403, 'Unauthorized. Read-only viewers cannot upload or create resources.');
+        }
+
+        $courseQuery = Course::where('is_active', true)->orderBy('name');
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $programId = $user->program_id;
+            $courseQuery->whereHas('programs', fn ($q) => $q->where('programs.id', $programId));
+        }
+
+        $courses = $courseQuery->get();
         $resourcesTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
         $academicYears = AcademicYear::all();
 
@@ -125,6 +143,11 @@ class ResourceAdminController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+        if ($user && ! $user->canCreateResources()) {
+            abort(403, 'Unauthorized. Read-only viewers cannot upload or create resources.');
+        }
+
         $validated = $request->validate([
             'course_id' => ['required', 'exists:courses,id'],
             'resource_type_id' => ['required', 'exists:resource_types,id'],
@@ -133,25 +156,38 @@ class ResourceAdminController extends Controller
             'description' => ['nullable', 'string'],
             'exam_date' => ['nullable', 'date'],
             'language' => ['nullable', 'string', 'in:en,it,fa'],
-            'file' => ['required', 'file', 'mimes:pdf,zip,docx,pptx', 'max:51200'], // max 50MB
+            'status' => ['required', 'string', 'in:approved,pending,rejected'],
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:102400'], // max 100MB per file
         ]);
 
-        $file = $request->file('file');
-        $fileHash = hash_file('sha256', $file->getRealPath());
-
-        // Check for duplicate file
-        $existingFile = ResourceFile::where('sha256', $fileHash)->first();
-        if ($existingFile) {
-            return back()
-                ->withInput()
-                ->withErrors(['file' => 'This exact file was already uploaded.']);
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $course = Course::with('programs')->find($validated['course_id']);
+            if (! $course || ! $course->programs->contains('id', $user->program_id)) {
+                abort(403, 'Unauthorized. You can only create resources for courses belonging to your assigned major.');
+            }
         }
 
-        // Store file locally
-        $storedPath = $file->store('resources');
+        $filesToUpload = [];
+        foreach ($request->file('files') as $file) {
+            $fileHash = hash_file('sha256', $file->getRealPath());
 
-        // Save Resource + ResourceFile
-        $resourceFile = DB::transaction(function () use ($validated, $request, $file, $fileHash) {
+            // Check for duplicate file
+            $existingFile = ResourceFile::where('sha256', $fileHash)->first();
+            if ($existingFile) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was already uploaded."]);
+            }
+
+            $filesToUpload[] = [
+                'file' => $file,
+                'hash' => $fileHash,
+            ];
+        }
+
+        // Save Resource + ResourceFiles
+        $createdFiles = DB::transaction(function () use ($validated, $request, $filesToUpload) {
             $resource = Resource::create([
                 'course_id' => $validated['course_id'],
                 'resource_type_id' => $validated['resource_type_id'],
@@ -161,27 +197,42 @@ class ResourceAdminController extends Controller
                 'exam_date' => $validated['exam_date'] ?? null,
                 'language' => $validated['language'] ?? 'en',
                 'has_solutions' => $request->boolean('has_solutions'),
-                'status' => 'pending',
+                'status' => $validated['status'] ?? 'approved',
                 'submitted_by' => auth()->id(),
                 'reviewed_by' => auth()->id(),
                 'reviewed_at' => now(),
             ]);
 
-            return $resource->files()->create([
-                'original_filename' => $file->getClientOriginalName(),
-                'mime_type' => $file->getClientMimeType(),
-                'size_bytes' => $file->getSize(),
-                'sha256' => $fileHash,
-                'local_path' => $storedPath,
-            ]);
+            $records = [];
+            foreach ($filesToUpload as $item) {
+                $file = $item['file'];
+                $storedPath = $file->store('resources');
+
+                $resourceFile = $resource->files()->create([
+                    'original_filename' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getClientMimeType(),
+                    'size_bytes' => $file->getSize(),
+                    'sha256' => $item['hash'],
+                    'local_path' => $storedPath,
+                ]);
+
+                $records[] = [
+                    'resourceFile' => $resourceFile,
+                    'storedPath' => $storedPath,
+                ];
+            }
+
+            return $records;
         });
 
-        // Dispatch background sync job
-        UploadResourceFileJob::dispatch($resourceFile, $storedPath, "📚 {$validated['title']}");
+        // Dispatch background sync job for each file
+        foreach ($createdFiles as $item) {
+            UploadResourceFileJob::dispatch($item['resourceFile'], $item['storedPath'], "📚 {$validated['title']}");
+        }
 
         return redirect()
             ->route('admin.resources.index')
-            ->with('success', 'Resource uploaded! Syncing with Telegram and Google Drive in the background...');
+            ->with('success', count($createdFiles) . ' file(s) uploaded! Syncing with Telegram and Google Drive in the background...');
     }
 
     /**
@@ -189,8 +240,12 @@ class ResourceAdminController extends Controller
      */
     public function edit(Resource $resource)
     {
-        
-        $resource->load(['course', 'resourceType', 'academicYear', 'files', 'submitter', 'reviewer']);
+        $user = request()->user();
+        if ($user && ! $user->canEditResource($resource)) {
+            abort(403, 'Unauthorized. You do not have permission to edit this resource.');
+        }
+
+        $resource->load(['course.programs', 'resourceType', 'academicYear', 'files.reports', 'submitter', 'reviewer']);
 
         $courses = Course::where('is_active', true)->orderBy('name')->get();
         $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
@@ -209,6 +264,11 @@ class ResourceAdminController extends Controller
      */
     public function update(Request $request, Resource $resource, ResourceModerationService $moderation)
     {
+        $user = $request->user();
+        if ($user && ! $user->canEditResource($resource)) {
+            abort(403, 'Unauthorized. You do not have permission to edit this resource.');
+        }
+
         $oldStatus = $resource->status;
 
         $validated = $request->validate([
@@ -220,7 +280,9 @@ class ResourceAdminController extends Controller
             'exam_date' => ['nullable', 'date'],
             'language' => ['nullable', 'string', 'in:en,it,fa'],
             'status' => ['required', 'string', 'in:approved,pending,rejected'],
-            'file' => ['nullable', 'file', 'mimes:pdf,zip,docx,pptx', 'max:51200'],
+            'files' => ['nullable', 'array'],
+            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:102400'], // max 100MB per file
+            'file' => ['nullable', 'file', 'mimes:pdf,zip,docx,pptx', 'max:102400'],
         ]);
 
         $resource->update([
@@ -235,72 +297,164 @@ class ResourceAdminController extends Controller
             'status' => $validated['status'],
         ]);
 
-        // If admin uploaded a file to replace/sync with Google Drive & Local Storage
+        // Process any newly uploaded files
+        $incomingFiles = [];
+        if ($request->hasFile('files')) {
+            $incomingFiles = array_merge($incomingFiles, $request->file('files'));
+        }
         if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $storedPath = $file->store('resources');
-            $fullPath = Storage::disk('local')->path($storedPath);
-            $driveService = app(GoogleDriveService::class);
-            $driveFileId = null;
+            $incomingFiles[] = $request->file('file');
+        }
 
-            if ($driveService->isConfigured()) {
-                $course = Course::find($validated['course_id']);
-                $type = ResourceType::find($validated['resource_type_id']);
-                $courseFolderId = $course ? $driveService->getOrCreateFolder($course->name) : null;
-                $typeFolderId = $type ? $driveService->getOrCreateFolder($type->display_name, $courseFolderId) : $courseFolderId;
-                $driveFileId = $driveService->uploadFile(
-                    filePath: $fullPath,
-                    filename: $file->getClientOriginalName(),
-                    mimeType: $file->getClientMimeType(),
-                    folderId: $typeFolderId,
-                );
+        $createdFiles = [];
+        if (! empty($incomingFiles)) {
+            $filesToUpload = [];
+            foreach ($incomingFiles as $file) {
+                $fileHash = hash_file('sha256', $file->getRealPath());
+
+                $existingFile = ResourceFile::where('sha256', $fileHash)->first();
+                if ($existingFile) {
+                    return back()
+                        ->withInput()
+                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was already uploaded."]);
+                }
+
+                $filesToUpload[] = [
+                    'file' => $file,
+                    'hash' => $fileHash,
+                ];
             }
 
-            $primaryFile = $resource->files->first();
-            if ($primaryFile) {
-                $primaryFile->update([
-                    'original_filename' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getClientMimeType(),
-                    'size_bytes' => $file->getSize(),
-                    'local_path' => $storedPath,
-                    'drive_file_id' => $driveFileId ?: $primaryFile->drive_file_id,
-                ]);
-            } else {
-                $resource->files()->create([
-                    'original_filename' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getClientMimeType(),
-                    'size_bytes' => $file->getSize(),
-                    'sha256' => hash_file('sha256', $file->getRealPath()),
-                    'local_path' => $storedPath,
-                    'drive_file_id' => $driveFileId,
-                ]);
+            $createdFiles = DB::transaction(function () use ($resource, $filesToUpload) {
+                $records = [];
+                foreach ($filesToUpload as $item) {
+                    $file = $item['file'];
+                    $storedPath = $file->store('resources');
+
+                    $resourceFile = $resource->files()->create([
+                        'original_filename' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getClientMimeType(),
+                        'size_bytes' => $file->getSize(),
+                        'sha256' => $item['hash'],
+                        'local_path' => $storedPath,
+                    ]);
+
+                    $records[] = [
+                        'resourceFile' => $resourceFile,
+                        'storedPath' => $storedPath,
+                    ];
+                }
+
+                return $records;
+            });
+
+            foreach ($createdFiles as $item) {
+                UploadResourceFileJob::dispatch($item['resourceFile'], $item['storedPath'], "📚 {$resource->title}");
             }
         }
+
+        // Collect IDs of any files newly uploaded by the admin in this request to avoid duplicate processing
+        $newFileIds = array_map(fn ($item) => $item['resourceFile']->id, $createdFiles);
 
         // If status changed and reviewer is available, trigger student notification
         $newStatus = $validated['status'];
         if ($oldStatus !== $newStatus && $request->user()) {
             if ($newStatus === 'approved') {
-                $moderation->approve($resource, $request->user());
+                $moderation->approve($resource, $request->user(), excludeFileIds: $newFileIds);
             } elseif ($newStatus === 'rejected') {
                 $moderation->reject($resource, $request->user());
             }
         }
 
+        $extraMsg = ! empty($createdFiles)
+            ? ' and ' . count($createdFiles) . ' new file(s) attached for background syncing'
+            : '';
+
         return redirect()
             ->route('admin.resources.index')
-            ->with('success', "Resource '{$resource->title}' updated successfully!");
+            ->with('success', "Resource '{$resource->title}' updated successfully{$extraMsg}!");
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Delete an individual file associated with a resource.
      */
-    public function destroy(Resource $resource)
+    public function destroyFile(Resource $resource, ResourceFile $file, GoogleDriveService $driveService, TelegramService $telegram)
     {
-        $title = $resource->title;
+        $user = request()->user();
+        if ($user && ! $user->canDeleteResource($resource)) {
+            abort(403, 'Unauthorized. You do not have permission to delete this file.');
+        }
 
-        // Delete associated files
+        if ($file->resource_id !== $resource->id) {
+            abort(404);
+        }
+
+        // Clean up from local storage
+        if ($file->local_path && Storage::disk('local')->exists($file->local_path)) {
+            Storage::disk('local')->delete($file->local_path);
+        }
+
+        // Clean up from Google Drive
+        $driveDeleted = true;
+        if ($file->drive_file_id) {
+            $driveDeleted = $driveService->deleteFile($file->drive_file_id);
+        }
+
+        // Clean up from Telegram storage channel if message ID is known
+        $storageChannelId = config('telegram.storage_channel_id');
+        if ($file->telegram_message_id && $storageChannelId) {
+            try {
+                $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+            }
+        }
+
+        $filename = $file->original_filename;
+        $file->delete();
+
+        $driveNote = (! $driveDeleted && $file->drive_file_id) ? ' (Note: Google Drive file removal failed)' : '';
+
+        // If no files remain on this resource, remove the empty resource as well
+        if ($resource->files()->count() === 0) {
+            $resource->delete();
+
+            return redirect()
+                ->route('admin.resources.index')
+                ->with('success', "File '{$filename}' was deleted. The resource had no remaining files and was also removed.{$driveNote}");
+        }
+
+        return back()->with('success', "File '{$filename}' was deleted successfully from local storage, Google Drive, and Telegram.{$driveNote}");
+    }
+
+    /**
+     * Remove the specified resource from storage along with all its attached files.
+     */
+    public function destroy(Resource $resource, GoogleDriveService $driveService, TelegramService $telegram)
+    {
+        $user = request()->user();
+        if ($user && ! $user->canDeleteResource($resource)) {
+            abort(403, 'Unauthorized. You do not have permission to delete this resource.');
+        }
+
+        $title = $resource->title;
+        $storageChannelId = config('telegram.storage_channel_id');
+
+        // Delete associated files from local disk, Google Drive, and Telegram
         foreach ($resource->files as $file) {
+            if ($file->local_path && Storage::disk('local')->exists($file->local_path)) {
+                Storage::disk('local')->delete($file->local_path);
+            }
+            if ($file->drive_file_id) {
+                $driveService->deleteFile($file->drive_file_id);
+            }
+            if ($file->telegram_message_id && $storageChannelId) {
+                try {
+                    $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
+                } catch (\Throwable $e) {
+                    Log::warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                }
+            }
             $file->delete();
         }
 

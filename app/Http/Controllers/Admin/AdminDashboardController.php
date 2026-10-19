@@ -135,6 +135,9 @@ class AdminDashboardController extends Controller
         $pendingCount = Resource::where('status', 'pending')->count();
         $withSolutions = Resource::where('has_solutions', true)->count();
 
+        $totalDownloads = (int) Resource::sum('downloads_count');
+        $totalInlineShares = (int) Resource::sum('inline_shares_count');
+
         $totalFiles = ResourceFile::count();
         $totalBytes = (int) ResourceFile::sum('size_bytes');
 
@@ -154,6 +157,8 @@ class AdminDashboardController extends Controller
             'approved' => $approvedCount,
             'pending' => $pendingCount,
             'with_solutions' => $withSolutions,
+            'total_downloads' => $totalDownloads,
+            'total_inline_shares' => $totalInlineShares,
             'total_files' => $totalFiles,
             'storage_bytes' => $totalBytes,
             'storage_formatted' => $this->formatBytes($totalBytes),

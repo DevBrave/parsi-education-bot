@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'submitted_by',
     'reviewed_by',
     'reviewed_at',
+    'downloads_count',
+    'inline_shares_count',
 ])]
 class Resource extends Model
 {

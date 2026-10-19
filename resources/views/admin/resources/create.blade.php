@@ -93,24 +93,37 @@
             </div>
         </div>
 
-        <!-- Has Solutions Checkbox -->
-        <div class="form-group">
-            <label class="checkbox-label" style="margin-top: 0.25rem;">
-                <input type="checkbox" name="has_solutions" value="1" {{ old('has_solutions') ? 'checked' : '' }}>
-                Includes Answers / Solutions
-            </label>
+        <!-- Status & Has Solutions in 2 Columns -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; align-items: center; margin-bottom: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="status">Publication Status *</label>
+                <select name="status" id="status" required>
+                    <option value="approved" {{ old('status', 'approved') === 'approved' ? 'selected' : '' }}>✅ Approved (Visible in Bot & Sync to Drive)</option>
+                    <option value="pending" {{ old('status') === 'pending' ? 'selected' : '' }}>⏳ Pending Review (Draft - Telegram Only)</option>
+                    <option value="rejected" {{ old('status') === 'rejected' ? 'selected' : '' }}>❌ Rejected</option>
+                </select>
+                @error('status') <span class="error-msg">{{ $message }}</span> @enderror
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0; padding-top: 1.5rem;">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_solutions" value="1" {{ old('has_solutions') ? 'checked' : '' }}>
+                    Includes Answers / Solutions
+                </label>
+            </div>
         </div>
 
         <!-- File Upload -->
         <div class="form-group">
-            <label>Attach File *</label>
+            <label>Attach Files * (Select one or more)</label>
             <div class="file-dropzone" id="dropzone">
-                <input type="file" name="file" id="file" required onchange="updateFileName(this)">
+                <input type="file" name="files[]" id="file" multiple required onchange="updateFileName(this)">
                 <div class="icon">📁</div>
-                <div class="title" id="file-label">Click or Drag & Drop File Here</div>
-                <div class="sub">Supports PDF, ZIP, DOCX, PPTX (up to 50MB)</div>
+                <div class="title" id="file-label">Click or Drag & Drop File(s) Here</div>
+                <div class="sub">Supports PDF, ZIP, DOCX, PPTX (up to 100MB per file)</div>
             </div>
-            @error('file') <span class="error-msg">{{ $message }}</span> @enderror
+            @error('files') <span class="error-msg">{{ $message }}</span> @enderror
+            @error('files.*') <span class="error-msg">{{ $message }}</span> @enderror
         </div>
 
         <!-- Submit Button -->
@@ -170,8 +183,13 @@
 <script>
     function updateFileName(input) {
         const label = document.getElementById('file-label');
-        if (input.files && input.files[0]) {
-            label.innerText = 'Selected: ' + input.files[0].name;
+        if (input.files && input.files.length > 0) {
+            if (input.files.length === 1) {
+                label.innerText = 'Selected: ' + input.files[0].name;
+            } else {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                label.innerText = `Selected (${input.files.length} files): ${names}`;
+            }
             label.style.color = '#4f46e5';
         }
     }

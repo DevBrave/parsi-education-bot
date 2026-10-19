@@ -11,9 +11,11 @@
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">📚 Educational Resources</h1>
             <p style="color: var(--text-muted); font-size: 0.875rem;">Manage study materials and monitor their upload sync status across Telegram and Google Drive</p>
         </div>
-        <a href="{{ route('admin.resources.create') }}" class="btn btn-primary" style="padding: 0.65rem 1.25rem;">
-            ➕ Upload New Resource
-        </a>
+        @if(Auth::user()->canCreateResources())
+            <a href="{{ route('admin.resources.create') }}" class="btn btn-primary" style="padding: 0.65rem 1.25rem;">
+                ➕ Upload New Resource
+            </a>
+        @endif
     </div>
 
     <!-- Quick Stats Grid -->
@@ -154,8 +156,8 @@
                         <th style="min-width: 160px;">Course & Programmes</th>
                         <th style="min-width: 100px;">Type</th>
                         <th style="min-width: 110px;">Origin</th>
-                        <th style="min-width: 110px;">Attached File</th>
                         <th style="min-width: 120px;">Platform Status</th>
+                        <th style="min-width: 95px;">Downloads & Shares</th>
                         <th style="min-width: 75px;">Status</th>
                         <th style="text-align: right; min-width: 90px;">Actions</th>
                     </tr>
@@ -176,6 +178,9 @@
                                         @endif
                                         @if($resource->academicYear)
                                              <span style="font-size: 0.675rem; color: var(--text-muted); font-weight: 500;">{{ $resource->academicYear->label }}</span>
+                                        @endif
+                                        @if($primaryFile)
+                                             <span style="font-size: 0.675rem; color: var(--text-muted); font-weight: 500;">💾 {{ $primaryFile->formatted_size }}</span>
                                         @endif
                                         @if($resource->has_solutions)
                                             <span style="font-size: 0.65rem; font-weight: 600; color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 3px; padding: 1px 4px;">✓ Solved</span>
@@ -248,30 +253,6 @@
                                 @endif
                             </td>
 
-                            <!-- 5. Attached File Details -->
-                            <td>
-                                @if($primaryFile)
-                                    <div style="font-size: 0.775rem; line-height: 1.3;">
-                                        <div>
-                                            <a href="{{ route('admin.resources.download', [$resource, $primaryFile]) }}" target="_blank" style="font-weight: 600; color: var(--primary); text-decoration: none;" title="Download: {{ $primaryFile->original_filename }}">
-                                                📄 {{ Str::limit($primaryFile->original_filename, 18) }}
-                                            </a>
-                                        </div>
-                                        <div style="color: var(--text-muted); font-size: 0.685rem; margin-top: 0.15rem; display: flex; align-items: center; gap: 0.35rem;">
-                                            <span>{{ $primaryFile->formatted_size }}</span>
-                                            @if($primaryFile->drive_file_id)
-                                                <span>•</span>
-                                                <a href="https://drive.google.com/file/d/{{ $primaryFile->drive_file_id }}/view" target="_blank" style="color: #0284c7; text-decoration: none; font-weight: 600;" title="Preview on Google Drive">
-                                                    Drive ↗
-                                                </a>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @else
-                                    <span style="color: var(--text-muted); font-size: 0.725rem;">—</span>
-                                @endif
-                            </td>
-
                             <!-- 6. Platform Upload Status -->
                             <td>
                                 <div style="display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.72rem;">
@@ -305,7 +286,17 @@
                                 </div>
                             </td>
 
-                            <!-- 7. Overall Status -->
+                            <!-- 7. Downloads & Inline Shares -->
+                            <td>
+                                <div style="font-size: 0.775rem;">
+                                    <span style="font-weight: 700; color: #1e293b;">📥 {{ number_format($resource->downloads_count ?? 0) }}</span>
+                                    <div style="color: var(--text-muted); font-size: 0.685rem; margin-top: 0.15rem;">
+                                        🔍 {{ number_format($resource->inline_shares_count ?? 0) }} inline
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 8. Overall Status -->
                             <td>
                                 @if($resource->status === 'approved')
                                     <span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 6px; font-size: 0.725rem; font-weight: 600; display: inline-block;">Approved</span>
@@ -319,22 +310,31 @@
                             <!-- 8. Actions -->
                             <td style="text-align: right;">
                                 <div style="display: inline-flex; gap: 0.3rem; align-items: center; justify-content: flex-end;">
-                                    <a href="{{ route('admin.resources.edit', $resource) }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.725rem; border-radius: 4px;">
-                                        Edit
-                                    </a>
-                                    <form action="{{ route('admin.resources.destroy', $resource) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this resource?');" style="display: inline;">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.725rem; border-radius: 4px;">
-                                            Del
-                                        </button>
-                                    </form>
+                                    @if(Auth::user()->canEditResource($resource))
+                                        <a href="{{ route('admin.resources.edit', $resource) }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.725rem; border-radius: 4px;">
+                                            Edit
+                                        </a>
+                                    @endif
+                                    @if(Auth::user()->canDeleteResource($resource))
+                                        <form action="{{ route('admin.resources.destroy', $resource) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this resource?');" style="display: inline;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.725rem; border-radius: 4px;">
+                                                Del
+                                            </button>
+                                        </form>
+                                    @endif
+                                    @if(! Auth::user()->canEditResource($resource) && ! Auth::user()->canDeleteResource($resource))
+                                        <span style="font-size: 0.8rem; color: var(--text-muted); padding: 2px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+                                        👁️ View Only
+                                        </span>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
+                            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
                                 <div>
                                     <div style="font-size: 2rem; margin-bottom: 0.5rem;">📁</div>
                                     <strong>No resources found</strong>

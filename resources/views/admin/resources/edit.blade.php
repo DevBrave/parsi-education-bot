@@ -80,53 +80,88 @@
             </div>
         </div>
     </div>
-    @php
-        $primaryFile = $resource->files->first();
-    @endphp
-    @if($primaryFile)
-        <div class="card" style="padding: 1.25rem; background: #f8fafc; border: 1px solid var(--border);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
-                <div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Attached Document</span>
-                    <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-main); margin-top: 0.2rem;">
-                        📄 {{ $primaryFile->original_filename }}
-                    </h3>
-                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-                        Size: <strong>{{ $primaryFile->formatted_size }}</strong> &bull; Type: <code>{{ $primaryFile->mime_type }}</code>
-                    </div>
-                    <div style="margin-top: 0.75rem;">
-                        <a href="{{ route('admin.resources.download', [$resource, $primaryFile]) }}" target="_blank" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.9rem; font-size: 0.825rem; text-decoration: none;">
-                            📥 View / Download Document
-                        </a>
-                    </div>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end;">
-                    <!-- Telegram Badge -->
-                    @if($primaryFile->telegram_file_id)
-                        <span class="badge badge-success" title="ID: {{ $primaryFile->telegram_file_id }}">
-                            ✅ Telegram Synced
-                        </span>
-                    @else
-                        <span class="badge badge-warning">
-                            ⏳ Telegram Pending
-                        </span>
-                    @endif
-
-                    <!-- Google Drive Badge -->
-                    @if($primaryFile->drive_file_id)
-                        <span class="badge badge-info" title="ID: {{ $primaryFile->drive_file_id }}">
-                            📁 Drive Synced
-                        </span>
-                    @else
-                        <span class="badge badge-secondary">
-                            ⚪ No Drive Backup
-                        </span>
-                    @endif
-                </div>
+    <!-- Attached Files Management Card -->
+    <div class="card" style="border: 1px solid var(--border); overflow: hidden;">
+        <div class="card-header" style="background: #f8fafc;">
+            <div>
+                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                    📁 Attached Documents
+                    <span class="badge" style="background: var(--primary-light); color: var(--primary); font-size: 0.75rem;">
+                        {{ $resource->files->count() }} {{ \Illuminate\Support\Str::plural('file', $resource->files->count()) }}
+                    </span>
+                </h2>
+                <p>Manage existing documents or delete obsolete ones</p>
             </div>
         </div>
-    @endif
+
+        @if($resource->files->isEmpty())
+            <div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+                ⚠️ No documents are currently attached to this resource. Use the upload area below to add file(s).
+            </div>
+        @else
+            <div style="display: flex; flex-direction: column;">
+                @foreach($resource->files as $file)
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: #ffffff;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; max-width: 550px;">
+                            <span style="font-size: 1.5rem; line-height: 1;">📄</span>
+                            <div>
+                                <strong style="font-size: 0.925rem; color: var(--text-main); word-break: break-all;">
+                                    {{ $file->original_filename }}
+                                </strong>
+                                @php
+                                    $pendingFileReports = $file->reports ? $file->reports->where('status', \App\Models\ResourceReport::STATUS_PENDING) : collect();
+                                @endphp
+                                @if($pendingFileReports->isNotEmpty())
+                                    <span title="Reported issue by students" style="color: #ef4444; font-size: 1rem; margin-left: 0.35rem; font-weight: bold; vertical-align: middle;">❌</span>
+                                    <a href="{{ route('admin.reports.show', $pendingFileReports->first()) }}" class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; font-size: 0.7rem; text-decoration: none; padding: 0.15rem 0.45rem; font-weight: 700; margin-left: 0.25rem;">
+                                        Reported Issue ({{ $pendingFileReports->count() }})
+                                    </a>
+                                @endif
+                                <div style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                    Size: <strong>{{ $file->formatted_size }}</strong> &bull; Type: <code>{{ $file->mime_type }}</code>
+                                </div>
+                                <div style="display: flex; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                                    @if($file->telegram_file_id)
+                                        <span class="badge badge-success" style="font-size: 0.7rem;" title="ID: {{ $file->telegram_file_id }}">
+                                            ✅ Telegram Synced
+                                        </span>
+                                    @else
+                                        <span class="badge badge-warning" style="font-size: 0.7rem;">
+                                            ⏳ Telegram Pending
+                                        </span>
+                                    @endif
+
+                                    @if($file->drive_file_id)
+                                        <span class="badge badge-info" style="font-size: 0.7rem;" title="ID: {{ $file->drive_file_id }}">
+                                            📁 Drive Synced
+                                        </span>
+                                    @else
+                                        <span class="badge badge-secondary" style="font-size: 0.7rem;">
+                                            ⚪ No Drive Backup
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <a href="{{ route('admin.resources.download', [$resource, $file]) }}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">
+                                📥 Download
+                            </a>
+
+                            <form action="{{ route('admin.resources.files.destroy', [$resource, $file]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete \'{{ addslashes($file->original_filename) }}\'? This will remove it from local storage, Google Drive, and the bot.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    🗑️ Delete File
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
 
     <!-- Edit Form Card -->
     <div class="card">
@@ -235,13 +270,21 @@
                 </div>
             </div>
 
-            <!-- Optional File Upload / Replace for Google Drive Sync -->
-            <div class="form-group" style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 1rem;">
-                <label for="file" style="font-weight: 600; color: var(--text-main);">Upload / Replace File (for Local Cache & Google Drive Sync)</label>
-                <input type="file" id="file" name="file" accept=".pdf,.zip,.docx,.pptx" style="margin-top: 0.35rem;">
-                <small style="display: block; color: var(--text-muted); margin-top: 0.35rem; font-size: 0.775rem;">
-                    💡 Use this if the original material was submitted via Telegram and exceeds 20MB, to upload it directly to Google Drive and local storage. Max 50MB.
-                </small>
+            <!-- Optional Add New / Replacement Files -->
+            <div class="form-group" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.25rem;">
+                <label style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">
+                    ➕ Add New / Replacement Files (Optional)
+                </label>
+                <div class="file-dropzone" id="dropzone" style="margin-top: 0.5rem; background: #ffffff; position: relative;">
+                    <input type="file" name="files[]" id="files" multiple accept=".pdf,.zip,.docx,.pptx" onchange="updateFileNames(this)" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                    <div class="icon" style="font-size: 1.75rem; margin-bottom: 0.35rem;">📁</div>
+                    <div class="title" id="file-label" style="font-size: 0.9rem; font-weight: 600; color: var(--text-main);">Click or Drag & Drop File(s) Here to Attach</div>
+                    <div class="sub" style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Supports PDF, ZIP, DOCX, PPTX (up to 100MB per file). Newly added files will automatically sync to Telegram and Google Drive.
+                    </div>
+                </div>
+                @error('files') <span class="error-msg">{{ $message }}</span> @enderror
+                @error('files.*') <span class="error-msg">{{ $message }}</span> @enderror
                 @error('file') <span class="error-msg">{{ $message }}</span> @enderror
             </div>
 
@@ -258,4 +301,41 @@
     </div>
 
 </div>
+
+<style>
+    .file-dropzone {
+        border: 2px dashed var(--border);
+        border-radius: 8px;
+        padding: 1.5rem 1rem;
+        text-align: center;
+        background: #fdfdfd;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .file-dropzone:hover {
+        border-color: var(--primary);
+        background-color: #f8fafc;
+    }
+
+    .file-dropzone .title {
+        color: var(--text-main);
+    }
+</style>
+
+<script>
+    function updateFileNames(input) {
+        const label = document.getElementById('file-label');
+        if (input.files && input.files.length > 0) {
+            if (input.files.length === 1) {
+                label.innerText = 'Selected: ' + input.files[0].name;
+            } else {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                label.innerText = `Selected (${input.files.length} files): ${names}`;
+            }
+            label.style.color = '#4f46e5';
+        }
+    }
+</script>
 @endsection

@@ -243,10 +243,8 @@
             </div>
             <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap;">
                 <span class="badge badge-success">{{ $resourceStats['approved'] }} active</span>
-                @if($resourceStats['pending'] > 0)
-                    <span class="badge badge-secondary" style="background: #fef3c7; color: #92400e;">{{ $resourceStats['pending'] }} pending</span>
-                @endif
-                <span>• {{ $resourceStats['with_solutions'] }} with solutions</span>
+                <span class="badge badge-primary" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">📥 {{ number_format($resourceStats['total_downloads']) }} downloads</span>
+                <span>• 🔍 {{ number_format($resourceStats['total_inline_shares']) }} inline shares</span>
             </div>
         </div>
 
