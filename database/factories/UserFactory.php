@@ -25,14 +25,15 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'telegram_user_id' => fake()->unique()->numberBetween(1000000, 999999999),
+            'first_name' => fake()->firstName(),
+            'last_name' => fake()->lastName(),
+            'username' => fake()->userName(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
+            'preferred_language' => 'en',
+            'role' => 'admin',
         ];
     }
 

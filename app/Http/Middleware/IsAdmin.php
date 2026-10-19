@@ -18,8 +18,12 @@ class IsAdmin
     {
         $user = Auth::user();
 
-        if (! $user || $user->role !== 'admin') {
-            abort(403, 'Unauthorized. Admin access required.');
+        if (! $user) {
+            return redirect()->guest(route('admin.login'));
+        }
+
+        if (! $user->isStaff()) {
+            abort(403, 'Unauthorized. Staff access required.');
         }
 
         return $next($request);
