@@ -2,6 +2,8 @@
 
 namespace App\Telegram\Handlers;
 
+use App\Models\Course;
+use App\Models\Resource;
 use App\Models\User;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
@@ -24,6 +26,20 @@ class MessageHandler
         $lang = $user->preferred_language ?? 'en';
 
         if (str_starts_with($text, '/start')) {
+            $param = trim(substr($text, 6));
+            if (str_starts_with($param, 'res_')) {
+                $resourceId = (int) substr($param, 4);
+                app(CallbackQueryHandler::class)->handleSendResourceDirect($chatId, $resourceId, $user);
+
+                return;
+            }
+            if (str_starts_with($param, 'course_')) {
+                $courseId = (int) substr($param, 7);
+                app(CallbackQueryHandler::class)->handleSelectCourseDirect($chatId, $courseId, $user);
+
+                return;
+            }
+
             $this->sendMainMenu($chatId, $user);
         } elseif ($text === '/cancel' || strtolower($text) === 'cancel') {
             Cache::forget("user_upload_state:{$user->id}");
@@ -50,14 +66,56 @@ class MessageHandler
             );
         } elseif (in_array($text, ['⚙️ Settings', '⚙️ تنظیمات', '⚙️ Impostazioni', '/settings'], true)) {
             $this->sendSettingsMenu($chatId, $user);
-        } elseif (in_array($text, ['⚠️ Contact / Report', '⚠️ ارتباط / گزارش', '⚠️ Contatti / Segnalazioni'], true)) {
-            $this->telegram->sendMessage(
-                $chatId,
-                __('bot.sections.contact_coming_soon', [], $lang),
-                ProgramMenuKeyboard::backToMain($lang, 'contact')
-            );
+        } elseif (in_array($text, ['🔎 Search Resources', '🔎 Cerca Risorse', '🔎  جستجوی منابع درسی', '🔍 Search Resources', '🔍 Cerca Risorse', '🔍 جستجوی منابع', '/search'], true)) {
+            $this->sendSearchPrompt($chatId, $user);
+        } elseif (str_starts_with($text, '/search ')) {
+            $this->executeSearch($chatId, $user, trim(substr($text, 8)));
+        } elseif (in_array($text, ['⚠️ Contact / Report', '⚠️ ارتباط / گزارش', '⚠️ Contatti / Segnalazioni', '/contact', '/report'], true)) {
+            $this->sendContactReportMenu($chatId, $user);
         } else {
+            $contactCacheKey = "user_contact_state:{$user->id}";
+            $contactState = Cache::get($contactCacheKey);
+            if ($contactState && ($contactState['step'] ?? null) === 'awaiting_contact_message') {
+                Cache::forget($contactCacheKey);
+                $this->handleContactMessageSubmit($chatId, $user, trim($text));
+                return;
+            }
 
+            $searchCacheKey = "user_search_state:{$user->id}";
+            $searchState = Cache::get($searchCacheKey);
+            if ($searchState && ($searchState['step'] ?? null) === 'awaiting_search_query') {
+                Cache::forget($searchCacheKey);
+                $this->executeSearch($chatId, $user, trim($text));
+                return;
+            }
+
+            $cacheKey = "user_upload_state:{$user->id}";
+            $state = Cache::get($cacheKey);
+            if ($state && ($state['step'] ?? null) === 'awaiting_title') {
+                $state['title'] = trim($text) ?: 'New Material';
+                Cache::put($cacheKey, $state, now()->addMinutes(15));
+                $this->telegram->sendMessage(
+                    $chatId,
+                    __('bot.submit_material.writing_title', ['title' => $state['title']], $lang),
+                    ProgramMenuKeyboard::simpleYesOrNo($lang)
+                );
+                return;
+            }
+
+            if ($state && ($state['step'] ?? null) === 'awaiting_files') {
+                $this->telegram->sendMessage(
+                    $chatId,
+                    __('bot.submit_material.waiting_for_files', ['title' => $state['title'] ?? 'Material'], $lang),
+                    [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => __('bot.submit_material.cancel', [], $lang), 'callback_data' => 'cancel_upload'],
+                            ],
+                        ],
+                    ]
+                );
+                return;
+            }
             // TODO: Adding llm into the project and genrate a text based on user input
             $msg = __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang);
 
@@ -125,19 +183,15 @@ class MessageHandler
         if ($user->program_id) {
             $program = $user->program;
             if ($program && $program->is_active) {
-                $program->load(['courses' => function ($query) {
-                    $query->where('is_active', true)->orderBy('name');
-                }]);
-
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.submit_material.choose_course', [
+                $text = __('bot.courses.choose_year', [
                     'program' => e($program->name) . $levelTag,
                 ], $lang);
 
                 $this->telegram->sendMessage(
                     $chatId,
                     $text,
-                    ProgramMenuKeyboard::submitCourses($program, $lang)
+                    ProgramMenuKeyboard::years($program, $lang, forSubmission: true)
                 );
 
                 return;
@@ -193,6 +247,136 @@ class MessageHandler
             $chatId,
             $intro,
             ProgramMenuKeyboard::programmes($lang)
+        );
+    }
+
+    /**
+     * Send search prompt asking user for a course or keyword.
+     */
+    public function sendSearchPrompt(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        Cache::put("user_search_state:{$user->id}", ['step' => 'awaiting_search_query'], now()->addMinutes(10));
+
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.search.prompt', [], $lang),
+            ProgramMenuKeyboard::searchPrompt($lang)
+        );
+    }
+
+    /**
+     * Execute search across active courses and approved resources.
+     */
+    public function executeSearch(int $chatId, User $user, string $query, bool $showNavigation = true): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+
+        if (mb_strlen($query) < 2) {
+            $replyMarkup = $showNavigation ? ProgramMenuKeyboard::searchPrompt($lang) : null;
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.search.too_short', [], $lang),
+                $replyMarkup
+            );
+
+            return;
+        }
+
+        // Search active courses with programs
+        $courses = Course::with('programs')
+            ->where('is_active', true)
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                    ->orWhere('course_code', 'like', "%{$query}%");
+            })
+            ->take(5)
+            ->get();
+
+        // Search approved resources (by title, description, or course name/code)
+        $resources = Resource::where('status', 'approved')
+            ->where(function ($q) use ($query) {
+                $q->where('title', 'like', "%{$query}%")
+                    ->orWhere('description', 'like', "%{$query}%")
+                    ->orWhereHas('course', function ($cq) use ($query) {
+                        $cq->where('name', 'like', "%{$query}%")
+                            ->orWhere('course_code', 'like', "%{$query}%");
+                    });
+            })
+            ->with(['course', 'resourceType', 'files'])
+            ->take(8)
+            ->get();
+
+        if ($courses->isEmpty() && $resources->isEmpty()) {
+            $replyMarkup = $showNavigation ? [
+                'inline_keyboard' => [
+                    [['text' => __('bot.search.search_again', [], $lang), 'callback_data' => 'search_prompt']],
+                    [['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main']],
+                ],
+            ] : null;
+
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.search.no_results', ['query' => e($query)], $lang),
+                $replyMarkup
+            );
+
+            return;
+        }
+
+        $count = $courses->count() + $resources->count();
+        $text = __('bot.search.results_header', ['query' => e($query), 'count' => $count], $lang);
+
+        $programId = $user->program_id ?? 0;
+        $keyboard = ProgramMenuKeyboard::searchResults($courses, $resources, $lang, $programId, $showNavigation);
+
+        $this->telegram->sendMessage($chatId, $text, $keyboard);
+    }
+
+    /**
+     * Send Contact & Report Hub menu.
+     */
+    public function sendContactReportMenu(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.contact.hub_text', [], $lang),
+            ProgramMenuKeyboard::contactMenu($lang)
+        );
+    }
+
+    /**
+     * Handle submission of student contact / feedback message.
+     */
+    public function handleContactMessageSubmit(int $chatId, User $user, string $text): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+
+        if (mb_strlen($text) < 3) {
+            $this->telegram->sendMessage($chatId, __('bot.search.too_short', [], $lang));
+            return;
+        }
+
+        $adminChatId = config('telegram.admin_chat_id');
+        if ($adminChatId) {
+            $sender = $user->username
+                ? '@' . $user->username
+                : ($user->first_name ? $user->first_name : "User #{$user->telegram_user_id}");
+            $program = $user->program?->name ?? 'Not set';
+
+            $adminText = "📬 <b>New Student Feedback / Contact</b>\n\n"
+                . "👤 <b>From:</b> " . e($sender) . " (ID: <code>{$user->telegram_user_id}</code>)\n"
+                . "🎓 <b>Program:</b> " . e($program) . "\n\n"
+                . "💬 <b>Message:</b>\n" . e($text);
+
+            $this->telegram->sendMessage($adminChatId, $adminText);
+        }
+
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.contact.sent_success', [], $lang),
+            MainMenuKeyboard::build($lang)
         );
     }
 }

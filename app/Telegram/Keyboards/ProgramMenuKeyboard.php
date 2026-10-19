@@ -4,6 +4,7 @@ namespace App\Telegram\Keyboards;
 
 use App\Models\Course;
 use App\Models\Program;
+use App\Models\ResourceType;
 use Illuminate\Support\Collection;
 
 class ProgramMenuKeyboard
@@ -34,9 +35,11 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of academic years for a programme.
      */
-    public static function years(Program $program, ?string $lang = 'en'): array
+    public static function years(Program $program, ?string $lang = 'en', bool $forSubmission = false): array
     {
         $lang = $lang ?: 'en';
+        $prefix = $forSubmission ? 'submit_year' : 'course_year';
+        $backCallback = $forSubmission ? 'back_main_submit' : 'back_main_educational_files';
 
         // Detect years present in this program's active courses
         $distinctYears = $program->courses()
@@ -63,7 +66,7 @@ class ProgramMenuKeyboard
 
             $yearRow[] = [
                 'text' => $yearLabel,
-                'callback_data' => "course_year_{$program->id}_{$year}_1",
+                'callback_data' => "{$prefix}_{$program->id}_{$year}_1",
             ];
 
             // 2 buttons per row
@@ -79,7 +82,7 @@ class ProgramMenuKeyboard
 
         // All courses button
         $buttons[] = [
-            ['text' => __('bot.courses.year_all', [], $lang), 'callback_data' => "course_year_{$program->id}_all_1"],
+            ['text' => __('bot.courses.year_all', [], $lang), 'callback_data' => "{$prefix}_{$program->id}_all_1"],
         ];
 
         $buttons[] = [
@@ -87,7 +90,7 @@ class ProgramMenuKeyboard
         ];
 
         $buttons[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
+            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => $backCallback],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -186,7 +189,7 @@ class ProgramMenuKeyboard
         $buttons = [];
         foreach ($coursesPage as $course) {
             $buttons[] = [
-                ['text' => "📤 {$course->name}", 'callback_data' => "submit_res_{$course->id}"],
+                ['text' => "📤 {$course->name}", 'callback_data' => "submit_course_{$course->id}_{$program->id}_{$year}"],
             ];
         }
 
@@ -221,7 +224,45 @@ class ProgramMenuKeyboard
         }
 
         $buttons[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main'],
+            ['text' => __('bot.courses.change_year', [], $lang), 'callback_data' => "submit_prog_{$program->id}"],
+        ];
+
+        $buttons[] = [
+            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_submit'],
+        ];
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Build inline keyboard of active resource types for submitting materials for a course.
+     */
+    public static function submitResourceTypes(Course $course, int $programId, $year = 'all', ?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $types = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
+
+        $buttons = [];
+        $row = [];
+
+        foreach ($types as $type) {
+            $row[] = [
+                'text' => "📁 {$type->display_name}",
+                'callback_data' => "submit_type_{$course->id}_{$type->id}",
+            ];
+
+            if (count($row) === 2) {
+                $buttons[] = $row;
+                $row = [];
+            }
+        }
+
+        if (! empty($row)) {
+            $buttons[] = $row;
+        }
+
+        $buttons[] = [
+            ['text' => __('bot.courses.back_courses', [], $lang), 'callback_data' => "submit_year_{$programId}_{$year}_1"],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -243,6 +284,9 @@ class ProgramMenuKeyboard
         if (empty($buttons)) {
             $buttons[] = [
                 ['text' => __('bot.courses.no_types', [], $lang), 'callback_data' => 'noop'],
+            ];
+            $buttons[] = [
+                ['text' => __('bot.courses.submit_for_course', [], $lang), 'callback_data' => "submit_res_{$courseId}"],
             ];
         }
 
@@ -302,9 +346,10 @@ class ProgramMenuKeyboard
             $buttons[] = $paginationRow;
         }
 
-        // Button allowing students to contribute files
+        // Button allowing students to contribute files (passing course and category)
+        $submitData = $resourceTypeId ? "submit_res_{$courseId}_{$resourceTypeId}" : "submit_res_{$courseId}";
         $buttons[] = [
-            ['text' => __('bot.courses.submit_for_course', [], $lang), 'callback_data' => "submit_res_{$courseId}"],
+            ['text' => __('bot.courses.submit_for_course', [], $lang), 'callback_data' => $submitData],
         ];
 
         $buttons[] = [
@@ -325,6 +370,132 @@ class ProgramMenuKeyboard
         return [
             'inline_keyboard' => [
                 [['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => $callbackData]],
+            ],
+        ];
+    }
+
+    /**
+     * Simple Yes or No confirmation keyboard.
+     */
+    public static function simpleYesOrNo(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.simple_buttons.no', [], $lang), 'callback_data' => 'title_reject'],
+                    ['text' => __('bot.simple_buttons.yes', [], $lang), 'callback_data' => 'title_approved'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Inline keyboard for search results (courses and resources).
+     */
+    public static function searchResults($courses, $resources, ?string $lang = 'en', ?int $programId = 0, bool $showNavigation = true): array
+    {
+        $lang = $lang ?: 'en';
+        $buttons = [];
+
+        // Course buttons
+        foreach ($courses as $course) {
+            $progId = ($programId && $course->programs && $course->programs->contains('id', $programId))
+                ? $programId
+                : ($course->programs?->first()?->id ?? $programId);
+            $buttons[] = [
+                ['text' => "📖 {$course->name}", 'callback_data' => "course_{$course->id}_{$progId}_all"],
+            ];
+        }
+
+        // Resource buttons
+        foreach ($resources as $resource) {
+            $courseLabel = $resource->course?->name ? " ({$resource->course->name})" : '';
+            $filesCount = $resource->files ? $resource->files->count() : 0;
+            $filesBadge = $filesCount > 1 ? " [{$filesCount} files]" : '';
+            $buttons[] = [
+                ['text' => "📄 {$resource->title}{$courseLabel}{$filesBadge}", 'callback_data' => "send_resource_{$resource->id}"],
+            ];
+        }
+
+        // Navigation row: Search again + Back to main (only when requested, omitted in group searches)
+        if ($showNavigation) {
+            $buttons[] = [
+                ['text' => __('bot.search.search_again', [], $lang), 'callback_data' => 'search_prompt'],
+                ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main'],
+            ];
+        }
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Inline keyboard for search prompt (cancel or back).
+     */
+    public static function searchPrompt(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.search.cancel', [], $lang), 'callback_data' => 'back_main'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Report reasons inline keyboard.
+     */
+    public static function reportReasons(int $resourceId, int $fileId = 0, ?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $reasons = [
+            'corrupted' => __('bot.reports.reasons.corrupted', [], $lang),
+            'wrong_course' => __('bot.reports.reasons.wrong_course', [], $lang),
+            'poor_quality' => __('bot.reports.reasons.poor_quality', [], $lang),
+            'copyright' => __('bot.reports.reasons.copyright', [], $lang),
+            'other' => __('bot.reports.reasons.other', [], $lang),
+        ];
+
+        $buttons = [];
+        foreach ($reasons as $key => $label) {
+            $buttons[] = [
+                ['text' => $label, 'callback_data' => "report_submit_{$resourceId}_{$fileId}_{$key}"],
+            ];
+        }
+
+        $buttons[] = [
+            ['text' => __('bot.reports.cancel', [], $lang), 'callback_data' => 'report_cancel'],
+        ];
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Contact & Report Hub inline keyboard.
+     */
+    public static function contactMenu(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $channel = config('telegram.channel_username', 'PARSI_POLITO');
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.contact.report_material_btn', [], $lang), 'callback_data' => 'search_prompt'],
+                ],
+                [
+                    ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'contact_prompt'],
+                ],
+                [
+                    ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_contact'],
+                ],
             ],
         ];
     }

@@ -5,6 +5,7 @@ namespace App\Telegram\Handlers;
 use App\Models\Course;
 use App\Models\Program;
 use App\Models\Resource;
+use App\Models\ResourceReport;
 use App\Models\ResourceType;
 use App\Models\User;
 use App\Services\ResourceModerationService;
@@ -96,6 +97,41 @@ class CallbackQueryHandler
                 __('bot.settings.change_language_prompt', [], $lang),
                 OnboardingKeyboard::languages()
             );
+        } elseif ($data === 'search_prompt') {
+            Cache::put("user_search_state:{$user->id}", ['step' => 'awaiting_search_query'], now()->addMinutes(10));
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.search.prompt', [], $lang),
+                ProgramMenuKeyboard::searchPrompt($lang)
+            );
+        } elseif ($data === 'contact_prompt') {
+            Cache::put("user_contact_state:{$user->id}", ['step' => 'awaiting_contact_message'], now()->addMinutes(15));
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.contact.write_prompt', [], $lang),
+                [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => __('bot.submit_material.cancel', [], $lang), 'callback_data' => 'cancel_contact'],
+                        ],
+                    ],
+                ]
+            );
+        } elseif ($data === 'cancel_contact') {
+            Cache::forget("user_contact_state:{$user->id}");
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.contact.cancelled', [], $lang),
+                ['inline_keyboard' => []]
+            );
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
+                MainMenuKeyboard::build($lang)
+            );
         } elseif ($data === 'edu_files') {
             if ($user->program_id && $user->program && $user->program->is_active) {
                 $this->handleSelectProgram($chatId, $messageId, $user->program_id, $user);
@@ -117,12 +153,53 @@ class CallbackQueryHandler
             $this->handleSelectResourceType($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'send_resource_')) {
             $this->handleSendResource($chatId, $data, $user);
+        } elseif (str_starts_with($data, 'submit_prog_')) {
+            $programId = (int) substr($data, strlen('submit_prog_'));
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.courses.choose_year', [
+                    'program' => e($program->name) . $levelTag,
+                ], $lang);
+
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $text,
+                    ProgramMenuKeyboard::years($program, $lang, forSubmission: true)
+                );
+            }
         } elseif (str_starts_with($data, 'submit_year_')) {
             $this->handleSelectSubmitCourseYear($chatId, $messageId, $data, $user);
+        } elseif (str_starts_with($data, 'submit_course_')) {
+            $parts = explode('_', $data);
+            $courseId = (int) ($parts[2] ?? 0);
+            $programId = (int) ($parts[3] ?? 0);
+            $year = $parts[4] ?? 'all';
+            $this->handleSelectSubmitCourseType($chatId, $messageId, $courseId, $programId, $year, $user);
+        } elseif (str_starts_with($data, 'submit_type_')) {
+            $parts = explode('_', $data);
+            $courseId = (int) ($parts[2] ?? 0);
+            $resourceTypeId = (int) ($parts[3] ?? 0);
+            $this->handleSubmitResourcePrompt($chatId, $messageId, $courseId, $user, $resourceTypeId);
         } elseif (str_starts_with($data, 'submit_res_')) {
-            $this->handleSubmitResourcePrompt($chatId, $messageId, (int) substr($data, 11), $user);
+            $parts = explode('_', $data);
+            $courseId = (int) ($parts[2] ?? 0);
+            $resourceTypeId = isset($parts[3]) ? (int) $parts[3] : null;
+            $this->handleSubmitResourcePrompt($chatId, $messageId, $courseId, $user, $resourceTypeId);
         } elseif ($data === 'cancel_upload') {
-            Cache::forget("user_upload_state:{$user->id}");
+            $stateKey = "user_upload_state:{$user->id}";
+            $state = Cache::get($stateKey);
+            if ($state && ! empty($state['resource_id'])) {
+                $resource = Resource::with('files')->find($state['resource_id']);
+                if ($resource && $resource->status === 'pending') {
+                    foreach ($resource->files as $file) {
+                        $file->delete();
+                    }
+                    $resource->delete();
+                }
+            }
+            Cache::forget($stateKey);
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
@@ -133,6 +210,63 @@ class CallbackQueryHandler
                 $chatId,
                 __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
                 MainMenuKeyboard::build($lang)
+            );
+        } elseif ($data === 'finish_upload') {
+            $this->handleFinishUpload($chatId, $messageId, $user);
+        } elseif ($data == 'title_approved') {
+            $stateKey = "user_upload_state:{$user->id}";
+            $state = Cache::get($stateKey);
+            if ($state) {
+                $state['step'] = 'awaiting_files';
+                Cache::put($stateKey, $state, now()->addMinutes(15));
+            }
+
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.submit_material.title_approved', [], $lang),
+                ['inline_keyboard' => []]
+            );
+        } elseif ($data === 'title_reject') {
+            $stateKey = "user_upload_state:{$user->id}";
+            $state = Cache::get($stateKey);
+            if ($state) {
+                unset($state['title']);
+                $state['step'] = 'awaiting_title';
+                Cache::put($stateKey, $state, now()->addMinutes(15));
+            }
+
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.submit_material.title_rejected', [], $lang),
+                ['inline_keyboard' => []]
+            );
+        } elseif (str_starts_with($data, 'report_prompt_')) {
+            $payload = substr($data, strlen('report_prompt_'));
+            $parts = explode('_', $payload);
+            $resourceId = (int) ($parts[0] ?? 0);
+            $fileId = isset($parts[1]) ? (int) $parts[1] : 0;
+            $this->handleReportPrompt($chatId, $messageId, $resourceId, $fileId, $user);
+        } elseif (str_starts_with($data, 'report_submit_')) {
+            $payload = substr($data, strlen('report_submit_'));
+            $parts = explode('_', $payload);
+            if (count($parts) >= 3) {
+                $resourceId = (int) $parts[0];
+                $fileId = (int) $parts[1];
+                $reason = $parts[2];
+            } else {
+                $resourceId = (int) ($parts[0] ?? 0);
+                $fileId = 0;
+                $reason = $parts[1] ?? 'other';
+            }
+            $this->handleReportSubmit($chatId, $messageId, $resourceId, $fileId, $reason, $user);
+        } elseif ($data === 'report_cancel') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.reports.cancelled', [], $lang),
+                ['inline_keyboard' => []]
             );
         }
     }
@@ -164,16 +298,42 @@ class CallbackQueryHandler
         );
     }
 
-    protected function handleSubmitResourcePrompt(int $chatId, int $messageId, int $courseId, User $user): void
+    protected function handleSelectSubmitCourseType(int $chatId, int $messageId, int $courseId, int $programId, $year, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $course = Course::find($courseId);
+        if (! $course) {
+            return;
+        }
+
+        $text = __('bot.submit_material.choose_type', ['course' => e($course->name)], $lang);
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            $text,
+            ProgramMenuKeyboard::submitResourceTypes($course, $programId, $year, $lang)
+        );
+    }
+
+    protected function handleSubmitResourcePrompt(int $chatId, int $messageId, int $courseId, User $user, ?int $resourceTypeId = null): void
     {
         $lang = $user->preferred_language ?? 'en';
         $course = Course::find($courseId);
         $courseName = $course ? e($course->name) : 'this course';
 
+        $type = $resourceTypeId ? ResourceType::find($resourceTypeId) : null;
+        if ($type) {
+            $courseName .= " ({$type->display_name})";
+        }
+
+        $cacheData = ['course_id' => $courseId];
+        if ($resourceTypeId) {
+            $cacheData['resource_type_id'] = $resourceTypeId;
+        }
+        $cacheData['step'] = 'awaiting_title';
         // Set user state in cache for 15 minutes (We check this in fileuploadhandler)
-        Cache::put("user_upload_state:{$user->id}", [
-            'course_id' => $courseId,
-        ], now()->addMinutes(15));
+        Cache::put("user_upload_state:{$user->id}", $cacheData, now()->addMinutes(15));
 
         $this->telegram->editMessageText(
             $chatId,
@@ -283,10 +443,6 @@ class CallbackQueryHandler
         $programId = $parentProgram->id;
 
         $resourceTypes = ResourceType::where('is_active', true)
-            ->whereHas('resources', function ($query) use ($course) {
-                $query->where('course_id', $course->id)
-                    ->where('status', 'approved');
-            })
             ->orderBy('sort_order')
             ->get();
 
@@ -313,6 +469,9 @@ class CallbackQueryHandler
         $year = $parts[5] ?? 'all';
         $page = (int) ($parts[6] ?? 1);
 
+        $course = Course::find($courseId);
+        $type = ResourceType::find($resourceTypeId);
+
         $resources = Resource::with('files')
             ->where('course_id', $courseId)
             ->where('resource_type_id', $resourceTypeId)
@@ -320,11 +479,46 @@ class CallbackQueryHandler
             ->whereHas('course', fn($query) => $query->where('is_active', true))
             ->get();
 
+        $courseName = $course ? e($course->name) : '';
+        $typeName = $type ? e($type->display_name) : '';
+
+        $headerText = $resources->isEmpty()
+            ? "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n" . __('bot.courses.no_materials', [], $lang)
+            : "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n" . __('bot.courses.available_resources', [], $lang);
+
         $this->telegram->editMessageText(
             $chatId,
             $messageId,
-            __('bot.courses.available_resources', [], $lang),
+            $headerText,
             ProgramMenuKeyboard::resources($resources, $courseId, $programId, $lang, $resourceTypeId, $year, $page, 6)
+        );
+    }
+
+    public function handleSendResourceDirect(int $chatId, int $resourceId, User $user): void
+    {
+        $this->handleSendResource($chatId, "send_resource_{$resourceId}", $user);
+    }
+
+    public function handleSelectCourseDirect(int $chatId, int $courseId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $course = Course::with('programs')->where('is_active', true)->find($courseId);
+        if (! $course) {
+            return;
+        }
+
+        $parentProgram = $user->program_id ? $course->programs->firstWhere('id', $user->program_id) : null;
+        if (! $parentProgram) {
+            $parentProgram = $course->programs->first();
+        }
+
+        $programId = $parentProgram?->id ?? 0;
+        $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
+
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.courses.choose_type', ['course' => e($course->name)], $lang),
+            ProgramMenuKeyboard::resourceTypes($resourceTypes, $course->id, $programId, $lang, 'all')
         );
     }
 
@@ -334,9 +528,6 @@ class CallbackQueryHandler
         $resourceId = substr($data, strlen('send_resource_'));
         $resource = ctype_digit($resourceId) ? Resource::with(['files', 'course.programs', 'submitter'])
             ->where('status', 'approved')
-            ->whereHas('resourceType', fn($query) => $query->where('is_active', true))
-            ->whereHas('course', fn($query) => $query->where('is_active', true)
-                ->whereHas('programs', fn($programQuery) => $programQuery->where('is_active', true)))
             ->find((int) $resourceId) : null;
 
         if (! $resource) {
@@ -360,15 +551,23 @@ class CallbackQueryHandler
         $contributor = $resource->submitter?->username
             ? '@' . e($resource->submitter->username)
             : ($resource->submitter?->first_name ? e($resource->submitter->first_name) : null);
-
-        $caption = __('bot.resources.caption_header', [
+        $baseCaption = __('bot.resources.caption_header', [
             'course' => $courseName,
             'title' => $title,
         ], $lang);
 
-        if ($contributor) {
-            $caption .= __('bot.resources.caption_contributor', ['contributor' => $contributor], $lang);
-        }
+        // Contributor display is currently disabled
+        // if ($contributor) {
+        //     $baseCaption .= __('bot.resources.caption_contributor', ['contributor' => $contributor], $lang);
+        // }
+
+        $channel = config('telegram.channel_username', 'PARSI_POLITO');
+        $bot = config('telegram.bot_username', 'parsi_politobot');
+
+        $socialFooter = __('bot.resources.caption_social_media', [
+            'channel' => ltrim($channel, '@'),
+            'bot' => ltrim($bot, '@'),
+        ], $lang);
 
         $programId = $user->program_id ?? $resource->course?->programs?->first()?->id ?? 0;
 
@@ -377,8 +576,32 @@ class CallbackQueryHandler
         $failedTgFiles = collect();
 
         foreach ($tgFiles as $file) {
+            $fileCaption = $baseCaption;
+
+            $fileCaption .= $socialFooter;
+
+            $fileMarkup = [
+                'inline_keyboard' => [],
+            ];
+
+            if ($file->drive_file_id) {
+                $fileMarkup['inline_keyboard'][] = [
+                    [
+                        'text' => __('bot.resources.download_drive', [], $lang),
+                        'url' => "https://drive.google.com/file/d/{$file->drive_file_id}/view",
+                    ],
+                ];
+            }
+
+            $fileMarkup['inline_keyboard'][] = [
+                [
+                    'text' => __('bot.reports.button', [], $lang),
+                    'callback_data' => "report_prompt_{$resource->id}_{$file->id}",
+                ],
+            ];
+
             try {
-                $response = $this->telegram->sendDocument($chatId, $file->telegram_file_id, $caption);
+                $response = $this->telegram->sendDocument($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup);
                 if ($response->json('ok')) {
                     $sentTgCount++;
                 } else {
@@ -392,6 +615,8 @@ class CallbackQueryHandler
 
         // If at least one file was sent via Telegram
         if ($sentTgCount > 0) {
+            $resource->increment('downloads_count');
+
             $unsentDriveFiles = $allFiles->filter(function ($file) use ($failedTgFiles) {
                 return (blank($file->telegram_file_id) || $failedTgFiles->contains('id', $file->id))
                     && filled($file->drive_file_id);
@@ -408,7 +633,9 @@ class CallbackQueryHandler
 
         // 2. Solution 2: Direct Google Drive link button when telegram_file_id is missing or failed
         if ($driveFiles->isNotEmpty()) {
-            $this->sendGoogleDriveDownloadOption($chatId, $resource, $driveFiles, $programId, $lang, $caption);
+            $resource->increment('downloads_count');
+            $fullCaption = $baseCaption . $socialFooter;
+            $this->sendGoogleDriveDownloadOption($chatId, $resource, $driveFiles, $programId, $lang, $fullCaption);
 
             return;
         }
@@ -442,6 +669,14 @@ class CallbackQueryHandler
             ];
         }
 
+        $firstFileId = $driveFiles->first()?->id ?? 0;
+        $buttons[] = [
+            [
+                'text' => __('bot.reports.button', [], $lang),
+                'callback_data' => "report_prompt_{$resource->id}_{$firstFileId}",
+            ],
+        ];
+
         $buttons[] = [
             [
                 'text' => __('bot.courses.back_types', [], $lang),
@@ -452,6 +687,78 @@ class CallbackQueryHandler
         $text = ($caption ? $caption . "\n\n" : '') . __('bot.resources.available_on_drive', [], $lang);
 
         $this->telegram->sendMessage($chatId, $text, ['inline_keyboard' => $buttons]);
+    }
+
+    /**
+     * Prompt student with reason options to report a faulty resource.
+     */
+    protected function handleReportPrompt(int $chatId, int $messageId, int $resourceId, int $fileId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $resource = Resource::with('files')->find($resourceId);
+
+        if (! $resource) {
+            $this->telegram->sendMessage($chatId, __('bot.resources.not_available', [], $lang));
+            return;
+        }
+
+        $targetFile = $fileId ? $resource->files->firstWhere('id', $fileId) : $resource->files->first();
+        $targetFileId = $targetFile?->id ?? 0;
+        $displayName = $targetFile?->original_filename ?: $resource->title;
+
+        $text = __('bot.reports.prompt_title', ['title' => e($displayName)], $lang);
+        $keyboard = ProgramMenuKeyboard::reportReasons($resourceId, $targetFileId, $lang);
+
+        $this->telegram->sendMessage($chatId, $text, $keyboard);
+    }
+
+    /**
+     * Submit a student report for a resource.
+     */
+    protected function handleReportSubmit(int $chatId, int $messageId, int $resourceId, int $fileId, string $reason, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $resource = Resource::with('files')->find($resourceId);
+
+        if (! $resource) {
+            $this->telegram->editMessageText($chatId, $messageId, __('bot.resources.not_available', [], $lang), ['inline_keyboard' => []]);
+            return;
+        }
+
+        $targetFile = $fileId ? $resource->files->firstWhere('id', $fileId) : null;
+        $validFileId = $targetFile?->id;
+
+        // Prevent duplicate pending reports from the same user for the same resource & file
+        $existing = ResourceReport::where('resource_id', $resourceId)
+            ->when($validFileId, fn($q) => $q->where('resource_file_id', $validFileId))
+            ->where('user_id', $user->id)
+            ->where('status', ResourceReport::STATUS_PENDING)
+            ->first();
+
+        if ($existing) {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.reports.already_reported', [], $lang),
+                ['inline_keyboard' => []]
+            );
+            return;
+        }
+
+        ResourceReport::create([
+            'resource_id' => $resource->id,
+            'resource_file_id' => $validFileId,
+            'user_id' => $user->id,
+            'reason' => $reason,
+            'status' => ResourceReport::STATUS_PENDING,
+        ]);
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            __('bot.reports.success', [], $lang),
+            ['inline_keyboard' => []]
+        );
     }
 
     /**
@@ -467,17 +774,22 @@ class CallbackQueryHandler
         $callbackId = $callbackQuery['id'];
         $adminChatId = config('telegram.admin_chat_id');
 
-        // Check permission: must be inside admin group or have admin role
-        $isAuthorized = ($chatId == $adminChatId) || ($user->role === 'admin');
-        if (! $isAuthorized) {
-            $this->telegram->answerCallbackQuery($callbackId, '⛔ You are not authorized to moderate this material.');
+        $resource = Resource::with(['course.programs', 'submitter', 'resourceType'])->find($resourceId);
+        if (! $resource) {
+            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
 
             return;
         }
 
-        $resource = Resource::with(['course', 'submitter', 'resourceType'])->find($resourceId);
-        if (! $resource) {
-            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
+        // Check permission: must be staff or inside admin chat, and if major professor, must belong to their major
+        $isGeneralStaff = $user->isAdmin() || $user->isEditor() || $user->isProfessor() || ($chatId == $adminChatId && ! $user->isMajorProfessor());
+        $canApprove = $isGeneralStaff || ($user->isMajorProfessor() && $user->canApproveResource($resource));
+
+        if (! $canApprove) {
+            $msg = $user->isMajorProfessor()
+                ? '⛔ You are only authorized to moderate materials for your assigned major.'
+                : '⛔ You are not authorized to moderate this material.';
+            $this->telegram->answerCallbackQuery($callbackId, $msg);
 
             return;
         }
@@ -536,16 +848,22 @@ class CallbackQueryHandler
         $callbackId = $callbackQuery['id'];
         $adminChatId = config('telegram.admin_chat_id');
 
-        $isAuthorized = ($chatId == $adminChatId) || ($user->role === 'admin');
-        if (! $isAuthorized) {
-            $this->telegram->answerCallbackQuery($callbackId, '⛔ You are not authorized to moderate this material.');
+        $resource = Resource::with(['course.programs', 'submitter'])->find($resourceId);
+        if (! $resource) {
+            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
 
             return;
         }
 
-        $resource = Resource::with(['course', 'submitter'])->find($resourceId);
-        if (! $resource) {
-            $this->telegram->answerCallbackQuery($callbackId, '⚠️ Resource not found.');
+        // Check permission: must be staff or inside admin chat, and if major professor, must belong to their major
+        $isGeneralStaff = $user->isAdmin() || $user->isEditor() || $user->isProfessor() || ($chatId == $adminChatId && ! $user->isMajorProfessor());
+        $canReject = $isGeneralStaff || ($user->isMajorProfessor() && $user->canApproveResource($resource));
+
+        if (! $canReject) {
+            $msg = $user->isMajorProfessor()
+                ? '⛔ You are only authorized to moderate materials for your assigned major.'
+                : '⛔ You are not authorized to moderate this material.';
+            $this->telegram->answerCallbackQuery($callbackId, $msg);
 
             return;
         }
@@ -579,5 +897,51 @@ class CallbackQueryHandler
 
         $this->telegram->answerCallbackQuery($callbackId, "❌ Material #{$resourceId} rejected.");
     }
-}
 
+    /**
+     * Finalize multi-file upload session and notify admins.
+     */
+    protected function handleFinishUpload(int $chatId, int $messageId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $stateKey = "user_upload_state:{$user->id}";
+        $state = Cache::get($stateKey);
+
+        if (! $state || empty($state['resource_id'])) {
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.submit_material.no_course_selected', [], $lang),
+                MainMenuKeyboard::build($lang)
+            );
+
+            return;
+        }
+
+        $resource = Resource::with(['course', 'resourceType', 'files'])->find($state['resource_id']);
+        Cache::forget($stateKey);
+
+        if (! $resource) {
+            return;
+        }
+
+        // Notify admins with summary of all attached files
+        $uploadHandler = app(FileUploadHandler::class);
+        $uploadHandler->notifyAdminsForResource($resource, $user);
+
+        $courseName = $resource->course ? e($resource->course->name) : 'Course';
+        $count = $resource->files->count();
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            __('bot.submit_material.success', ['course' => $courseName, 'count' => $count], $lang),
+            ['inline_keyboard' => []]
+        );
+
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
+            MainMenuKeyboard::build($lang)
+        );
+    }
+}

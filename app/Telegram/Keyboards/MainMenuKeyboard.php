@@ -14,9 +14,10 @@ class MainMenuKeyboard
         if ($lang === 'fa') {
             return [
                 'keyboard' => [
-                    [['text' => '📚 منابع درسی'], ['text' => '🔍 ادیزو']],
-                    [['text' => '📤 ارسال فایل درسی'], ['text' => '❓ ددلاین‌های مهم']],
-                    [['text' => '⚙️ تنظیمات'], ['text' => '⚠️ ارتباط / گزارش']],
+                    [['text' => '📚 منابع درسی'], ['text' => '🔎  جستجوی منابع درسی']],
+                    [['text' => '📤 ارسال فایل درسی'], ['text' => '🔍 ادیزو']],
+                    [['text' => '❓ ددلاین‌های مهم'], ['text' => '⚠️ ارتباط / گزارش']],
+                    [['text' => '⚙️ تنظیمات']],
                 ],
                 'resize_keyboard' => true,
                 'is_persistent' => true,
@@ -27,9 +28,10 @@ class MainMenuKeyboard
         if ($lang === 'it') {
             return [
                 'keyboard' => [
-                    [['text' => '📚 Materiali Didattici'], ['text' => '🔍 Edisu']],
-                    [['text' => '📤 Invia Materiale'], ['text' => '❓ Scadenze Importanti']],
-                    [['text' => '⚙️ Impostazioni'], ['text' => '⚠️ Contatti / Segnalazioni']],
+                    [['text' => '📚 Materiali Didattici'], ['text' => '🔎 Cerca Risorse']],
+                    [['text' => '📤 Invia Materiale'], ['text' => '🔍 Edisu']],
+                    [['text' => '❓ Scadenze Importanti'], ['text' => '⚙️ Impostazioni']],
+                    [['text' => '⚠️ Contatti / Segnalazioni']],
                 ],
                 'resize_keyboard' => true,
                 'is_persistent' => true,
@@ -39,9 +41,10 @@ class MainMenuKeyboard
 
         return [
             'keyboard' => [
-                [['text' => '📚 Study Resources'], ['text' => '🔍 Edisu']],
-                [['text' => '📤 Submit Material'], ['text' => '❓ Important Deadlines']],
-                [['text' => '⚙️ Settings'], ['text' => '⚠️ Contact / Report']],
+                [['text' => '📚 Study Resources'], ['text' => '🔎 Search Resources']],
+                [['text' => '📤 Submit Material'], ['text' => '🔍 Edisu']],
+                [['text' => '❓ Important Deadlines'], ['text' => '⚙️ Settings']],
+                [['text' => '⚠️ Contact / Report']],
             ],
             'resize_keyboard' => true,
             'is_persistent' => true,
