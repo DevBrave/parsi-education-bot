@@ -36,13 +36,13 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // In local dev, auto-login as the first admin user for convenience.
-        if (app()->isLocal()) {
-            $admin = User::where('role', 'admin')->first();
-            if ($admin) {
-                Auth::login($admin);
-            }
-        }
+        // // In local dev, auto-login as the first admin user for convenience.
+        // if (app()->isLocal()) {
+        //     $admin = User::where('role', 'admin')->first();
+        //     if ($admin) {
+        //         Auth::login($admin);
+        //     }
+        // }
     }
 
     /**

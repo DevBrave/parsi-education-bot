@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AcademicYearAdminController;
+use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CourseAdminController;
 use App\Http\Controllers\Admin\ProgramAdminController;
@@ -19,6 +20,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 });
 
+// Admin Authentication (Public)
+Route::prefix('admin')->group(function () {
+    Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
+    Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.submit');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+});
+
 Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     // 0. Dashboard
     Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
@@ -31,6 +39,7 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::get('/resources/{resource}/edit', [ResourceAdminController::class, 'edit'])->name('admin.resources.edit');
     Route::put('/resources/{resource}', [ResourceAdminController::class, 'update'])->name('admin.resources.update');
     Route::get('/resources/{resource}/files/{file}/download', [ResourceAdminController::class, 'downloadFile'])->name('admin.resources.download');
+    Route::delete('/resources/{resource}/files/{file}', [ResourceAdminController::class, 'destroyFile'])->name('admin.resources.files.destroy');
     Route::delete('/resources/{resource}', [ResourceAdminController::class, 'destroy'])->name('admin.resources.destroy');
 
     // 2. Academic Years
@@ -61,6 +70,18 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::get('/resource-types/{resourceType}/edit', [ResourceTypeAdminController::class, 'edit'])->name('admin.resource-types.edit');
     Route::put('/resource-types/{resourceType}', [ResourceTypeAdminController::class, 'update'])->name('admin.resource-types.update');
     Route::delete('/resource-types/{resourceType}', [ResourceTypeAdminController::class, 'destroy'])->name('admin.resource-types.destroy');
+
+    // 6. User & Role Management
+    Route::get('/users', [\App\Http\Controllers\Admin\UserAdminController::class, 'index'])->name('admin.users.index');
+    Route::get('/users/{user}/edit', [\App\Http\Controllers\Admin\UserAdminController::class, 'edit'])->name('admin.users.edit');
+    Route::put('/users/{user}', [\App\Http\Controllers\Admin\UserAdminController::class, 'update'])->name('admin.users.update');
+
+    // 7. Resource Reports
+    Route::get('/reports', [\App\Http\Controllers\Admin\ReportAdminController::class, 'index'])->name('admin.reports.index');
+    Route::get('/reports/{report}', [\App\Http\Controllers\Admin\ReportAdminController::class, 'show'])->name('admin.reports.show');
+    Route::post('/reports/{report}/resolve', [\App\Http\Controllers\Admin\ReportAdminController::class, 'resolve'])->name('admin.reports.resolve');
+    Route::post('/reports/{report}/dismiss', [\App\Http\Controllers\Admin\ReportAdminController::class, 'dismiss'])->name('admin.reports.dismiss');
+    Route::delete('/reports/{report}/resource', [\App\Http\Controllers\Admin\ReportAdminController::class, 'destroyResource'])->name('admin.reports.resource.destroy');
 });
 
 if (app()->isLocal()) {

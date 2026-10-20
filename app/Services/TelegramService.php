@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +17,21 @@ class TelegramService
     {
         $this->botToken = (string) config('telegram.bot_token');
         $this->baseUrl = config('telegram.api_url').$this->botToken;
+    }
+
+    /**
+     * Get an HTTP client instance configured with timeout and optional proxy.
+     */
+    protected function client(int $timeout = 15, int $connectTimeout = 8): PendingRequest
+    {
+        $client = Http::timeout($timeout)->connectTimeout($connectTimeout);
+
+        $proxy = config('telegram.proxy') ?: env('TELEGRAM_PROXY') ?: env('HTTPS_PROXY') ?: env('HTTP_PROXY');
+        if (! empty($proxy)) {
+            $client = $client->withOptions(['proxy' => $proxy]);
+        }
+
+        return $client;
     }
 
     /**
@@ -37,7 +53,7 @@ class TelegramService
             $payload['reply_markup'] = $replyMarkup;
         }
 
-        $response = Http::post("{$this->baseUrl}/sendMessage", $payload);
+        $response = $this->client()->post("{$this->baseUrl}/sendMessage", $payload);
 
         if ($response->failed()) {
             Log::error('Telegram sendMessage failed', [
@@ -57,14 +73,14 @@ class TelegramService
     {
         $payload = [
             'url' => $url,
-            'allowed_updates' => ['message', 'callback_query'],
+            'allowed_updates' => ['message', 'callback_query', 'inline_query'],
         ];
 
         if ($secretToken !== null) {
             $payload['secret_token'] = $secretToken;
         }
 
-        return Http::post("{$this->baseUrl}/setWebhook", $payload);
+        return $this->client()->post("{$this->baseUrl}/setWebhook", $payload);
     }
 
     /**
@@ -72,7 +88,7 @@ class TelegramService
      */
     public function getWebhookInfo(): Response
     {
-        return Http::get("{$this->baseUrl}/getWebhookInfo");
+        return $this->client()->get("{$this->baseUrl}/getWebhookInfo");
     }
 
     /**
@@ -96,7 +112,7 @@ class TelegramService
             $payload['reply_markup'] = $replyMarkup;
         }
 
-        $response = Http::post("{$this->baseUrl}/editMessageText", $payload);
+        $response = $this->client()->post("{$this->baseUrl}/editMessageText", $payload);
 
         if ($response->failed()) {
             Log::error('Telegram editMessageText failed', [
@@ -131,7 +147,7 @@ class TelegramService
             $payload['reply_markup'] = $replyMarkup;
         }
 
-        $response = Http::post("{$this->baseUrl}/editMessageCaption", $payload);
+        $response = $this->client()->post("{$this->baseUrl}/editMessageCaption", $payload);
 
         if ($response->failed()) {
             Log::error('Telegram editMessageCaption failed', [
@@ -145,11 +161,10 @@ class TelegramService
         return $response;
     }
 
-
     /**
      * Acknowledge an inline button press (removes the loading spinner).
      */
-    public function answerCallbackQuery(string $callbackQueryId, ?string $text = null): Response
+    public function answerCallbackQuery(string $callbackQueryId, ?string $text = null): ?Response
     {
         $payload = [
             'callback_query_id' => $callbackQueryId,
@@ -159,21 +174,71 @@ class TelegramService
             $payload['text'] = $text;
         }
 
-        return Http::post("{$this->baseUrl}/answerCallbackQuery", $payload);
+        try {
+            return $this->client(5, 3)->post("{$this->baseUrl}/answerCallbackQuery", $payload);
+        } catch (\Throwable $e) {
+            Log::warning('Telegram answerCallbackQuery failed or timed out: '.$e->getMessage(), [
+                'callback_query_id' => $callbackQueryId,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Answer an inline query (for typing @botusername query in any chat).
+     */
+    public function answerInlineQuery(string $inlineQueryId, array $results, int $cacheTime = 60): ?Response
+    {
+        $payload = [
+            'inline_query_id' => $inlineQueryId,
+            'results' => json_encode($results),
+            'cache_time' => $cacheTime,
+        ];
+
+        try {
+            $response = $this->client(5, 3)->post("{$this->baseUrl}/answerInlineQuery", $payload);
+            if (! $response->json('ok')) {
+                Log::error('Telegram answerInlineQuery rejected by Telegram API', [
+                    'inline_query_id' => $inlineQueryId,
+                    'status' => $response->status(),
+                    'response' => $response->json(),
+                ]);
+            }
+
+            return $response;
+        } catch (\Throwable $e) {
+            Log::warning('Telegram answerInlineQuery failed: '.$e->getMessage(), [
+                'inline_query_id' => $inlineQueryId,
+            ]);
+
+            return null;
+        }
     }
 
     /**
      * Upload and send a document from a local file path to Telegram.
      * Returns file_id and file_unique_id on success.
      */
-    public function uploadDocument(string|int $chatId, string $filePath, string $filename, ?string $caption = null): ?array
-    {
-        $response = Http::timeout(120)
+    public function uploadDocument(
+        string|int $chatId,
+        string $filePath,
+        string $filename,
+        ?string $caption = null,
+        string $parseMode = 'HTML'
+    ): ?array {
+        $payload = [
+            'chat_id' => $chatId,
+        ];
+
+        if ($caption !== null) {
+            $payload['caption'] = $caption;
+            $payload['parse_mode'] = $parseMode;
+        }
+
+        $response = $this->client(120, 15)
             ->attach('document', file_get_contents($filePath), $filename)
-            ->post("{$this->baseUrl}/sendDocument", array_filter([
-                'chat_id' => $chatId,
-                'caption' => $caption,
-            ]));
+            ->post("{$this->baseUrl}/sendDocument", $payload);
 
         if (! $response->json('ok')) {
             Log::error('Telegram uploadDocument failed', [
@@ -217,7 +282,7 @@ class TelegramService
             $payload['reply_markup'] = $replyMarkup;
         }
 
-        $response = Http::post("{$this->baseUrl}/sendDocument", $payload);
+        $response = $this->client()->post("{$this->baseUrl}/sendDocument", $payload);
         if (! $response->json('ok')) {
             Log::error('Telegram sendDocument failed', [
                 'chat_id' => $chatId,
@@ -252,7 +317,7 @@ class TelegramService
             $payload['reply_markup'] = $replyMarkup;
         }
 
-        $response = Http::post("{$this->baseUrl}/sendPhoto", $payload);
+        $response = $this->client()->post("{$this->baseUrl}/sendPhoto", $payload);
         if (! $response->json('ok')) {
             Log::error('Telegram sendPhoto failed', [
                 'chat_id' => $chatId,
@@ -265,7 +330,7 @@ class TelegramService
 
     public function getMe(): Response
     {
-        return Http::get("{$this->baseUrl}/getMe");
+        return $this->client()->get("{$this->baseUrl}/getMe");
     }
 
     /**
@@ -273,7 +338,7 @@ class TelegramService
      */
     public function getFile(string $fileId): ?array
     {
-        $response = Http::post("{$this->baseUrl}/getFile", [
+        $response = $this->client()->post("{$this->baseUrl}/getFile", [
             'file_id' => $fileId,
         ]);
 
@@ -296,5 +361,25 @@ class TelegramService
     {
         return "https://api.telegram.org/file/bot{$this->botToken}/{$filePath}";
     }
-}
 
+    /**
+     * Delete a message from a chat or channel by its message ID.
+     */
+    public function deleteMessage(int|string $chatId, int|string $messageId): Response
+    {
+        $response = $this->client()->post("{$this->baseUrl}/deleteMessage", [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+        ]);
+
+        if (! $response->json('ok')) {
+            Log::warning('Telegram deleteMessage failed', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'response' => $response->json(),
+            ]);
+        }
+
+        return $response;
+    }
+}

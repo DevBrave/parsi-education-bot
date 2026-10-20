@@ -1,6 +1,28 @@
 # PARSI Education Bot - Architecture & Enhancements Roadmap
 
-This document outlines the design, technical specifications, and implementation roadmap for eight key platform enhancements.
+**Project owner:** PARSI Educational Committee, Politecnico di Torino  
+**Document status:** Active Development & Execution Plan  
+**Last updated:** 19 October 2026
+
+---
+
+## 📊 Executive Roadmap Dashboard & Status Matrix
+
+| # | Enhancement Feature | Status | Components Affected | Priority |
+| :--- | :--- | :---: | :--- | :---: |
+| **1** | **Google Drive Manual & Batch Sync in Admin** | 🟡 Partial | Admin Controller, Views, GoogleDriveService | High |
+| **2** | **Telegram Storage Channel Auto-Archival** | 🟡 Ready for Wiring | `ResourceModerationService`, Telegram CDN | High |
+| **3** | **Automated Malware & Antivirus Scanner** | ⏳ Planned | `FileUploadHandler`, Security Pipeline | Medium |
+| **4** | **Community vs. Official Resource Distinctions** | ✅ **Completed** | Admin Views, Eloquent Models, Filters | Done |
+| **5** | **Student Issue Reporting via Telegram Bot** | 🟡 In Progress | Bot Keyboards, Handlers, `resource_reports` | High |
+| **6** | **Live Log Viewer & Real-Time Monitoring** | ⏳ Planned | `/admin/logs`, SSE Streaming, Console UI | Medium |
+| **7** | **Dedicated Reports Center (`/admin/reports`)** | 🟡 In Progress | ReportAdminController, Blade Views | High |
+| **8** | **Performance & Latency Optimization** | 🟡 Partial | Caching, Eager-Loading, Timeout Tuning | Medium |
+| **9** | **In-Chat, Group & Inline Query Search Engine** | ✅ **Completed** | `InlineQueryHandler`, Group Mention, Direct Send | Done |
+| **10**| **Live Download & Inline Click Analytics Counter**| ✅ **Completed** | `chosen_inline_result`, Admin KPI & Table | Done |
+| **11**| **Email & Password Admin Authentication** | ✅ **Completed** | `AdminAuthController`, Login view, CLI set | Done |
+| **12**| **Multi-Tier Role System (Admin/Editor/Prof/Viewer)**| ✅ **Completed** | `/admin/users`, User model, RBAC policies | Done |
+| **13**| **Informational Sections (EDISU, Deadlines)** | ⏳ Queued | `bot.php`, `MessageHandler`, Static Guides | Normal |
 
 ---
 
@@ -10,13 +32,13 @@ This document outlines the design, technical specifications, and implementation 
 Allow administrators to manually trigger Google Drive uploads for any resource file directly from the Admin Panel, as well as run batch synchronization for all materials missing a Google Drive backup.
 
 ### Current State
-- When a resource is uploaded via the admin panel, `UploadResourceFileJob` is dispatched to sync to Telegram and Google Drive.
-- However, if the Google Drive OAuth token was expired or a network timeout occurred, the resource remains with `drive_file_id = NULL` and `No Drive Backup`.
-- There is currently no UI button in the admin panel to retry or force a sync to Google Drive.
+- When a resource is uploaded via the admin panel, `GoogleDriveService` uploads the file and stores `drive_file_id`.
+- If Google Drive encounters a network timeout or token issue, files can remain with `drive_file_id = NULL` (`No Drive Backup`).
+- Needs per-file manual retry button and a global batch sync button.
 
 ### Proposed Architecture & Implementation
 1. **Controller Endpoints (`ResourceAdminController`)**:
-   - `POST /admin/resources/{resource}/sync-drive`: Triggers a sync for all files of a specific resource.
+   - `POST /admin/resources/{resource}/sync-drive`: Triggers an immediate Google Drive upload for all files belonging to a specific resource.
    - `POST /admin/resources/sync-drive-all`: Queries all `ResourceFile` records where `drive_file_id IS NULL` and dispatches `UploadResourceFileJob` for each.
 2. **UI Enhancements**:
    - **Per-row button**: In the resource table and on the Edit page, add a `🔄 Sync to Drive` button next to files with `⚪ No Drive Backup`.
@@ -51,17 +73,18 @@ sequenceDiagram
 ```
 
 ### Technical Specification
-1. **Config Key**:
-   - `config('telegram.storage_channel_id')` or `env('TELEGRAM_STORAGE_CHANNEL_ID')`.
+1. **Database & Configuration**:
+   - Migration `2026_10_18_170000_add_storage_channel_message_id_to_resource_files_table.php` is **already migrated**.
+   - Config key: `config('telegram.storage_channel_id')` or `env('TELEGRAM_STORAGE_CHANNEL_ID')`.
 2. **Service Method in `ResourceModerationService::approve`**:
-   - Call `TelegramService::sendDocument()` targeting `TELEGRAM_STORAGE_CHANNEL_ID` with a formatted caption:
+   - Call `TelegramService::sendDocument()` targeting `TELEGRAM_STORAGE_CHANNEL_ID` with a formatted verified caption:
      ```
      📚 #ApprovedResource: Course Name
      📝 Title: Resource Title
      👤 Contributor: @username
      🗂️ Type: Exam / Summary
      ```
-   - Store `telegram_storage_message_id` on the `resource_files` record.
+   - Store `storage_channel_message_id` on the `resource_files` record.
 
 ---
 
@@ -72,14 +95,14 @@ Protect administrators, the server, and students from malicious files (trojans, 
 
 ### Multi-Layer Security Architecture
 
-#### Layer 1: File Sanitization & Extension Whitelisting (Synchronous)
-- **Strict MIME & Extension Matching**: Only allow safe documents (`.pdf`, `.zip` with inspection, `.docx`, `.pptx`).
+#### Layer 1: File Sanitization & Extension Whitelisting (Synchronous - Completed)
+- **Strict MIME & Extension Matching**: Only allow safe documents (`.pdf`, `.zip`, `.docx`, `.pptx`).
 - **Reject Executable Extensions**: Reject `.exe`, `.bat`, `.sh`, `.vbs`, `.js`, `.scr`, `.jar`, `.docm`, `.xlsm`.
 - **Magic Bytes Verification**: Inspect file headers via PHP `finfo_file()` to ensure the declared extension matches the true binary signature.
 
 #### Layer 2: Automated Antivirus Scanning Engine
 - **Option A: ClamAV Daemon (`clamd`)**:
-  - Open-source, free, runs on the host server or Docker container.
+  - Open-source, runs on the host server or Docker container.
   - PHP communicates via UNIX/TCP socket (`clamdscan` / `quahog` client).
   - Fast local scanning (< 500ms for typical PDFs).
 - **Option B: VirusTotal Public/Enterprise API**:
@@ -87,7 +110,7 @@ Protect administrators, the server, and students from malicious files (trojans, 
   - If unknown, upload the binary for scanning (asynchronous queue).
 
 #### Moderation Handling on Infection
-- If virus detected:
+- If malware is detected:
   1. Immediately quarantine or delete the file from local storage.
   2. Mark resource as `status = 'rejected'` with reason: `Malware detected`.
   3. Log security incident with user's Telegram ID.
@@ -96,14 +119,9 @@ Protect administrators, the server, and students from malicious files (trojans, 
 
 ---
 
-## 4. Community vs. Official PARSI Resource Distinctions in Admin Panel (Implemented)
+## 4. Community vs. Official PARSI Resource Distinctions in Admin Panel (✅ Completed)
 
-### Objective
-Allow administrators in the Admin Panel to easily distinguish between:
-1. **🛡️ Official PARSI Resources**: Uploaded directly by administrators from the admin web panel.
-2. **👤 Community Submissions**: Submitted by university students via the Telegram bot.
-
-### Implementation Details
+### Implementation Overview
 - **Submitter Identification**:
   - `isCommunitySubmission()`: `submitted_by IS NOT NULL AND users.role != 'admin'`.
   - `isOfficial()`: `submitted_by IS NULL OR users.role == 'admin'`.
@@ -117,7 +135,37 @@ Allow administrators in the Admin Panel to easily distinguish between:
 
 ---
 
-## 5. Resource Reporting & Quality Feedback System (Student Flagging)
+## 5. In-Chat, Group Mention & Inline Query Search Engine (✅ Completed)
+
+### Implementation Overview
+- **Private Chat Search**:
+  - Search by course name, course code, title, and description.
+- **Group Mention Search**:
+  - In university group chats, students type `@parsi_politobot <keyword>`.
+  - Clean inline keyboard results without navigation back buttons, keeping group chats uncluttered.
+- **Telegram Inline Query Anywhere (`@parsi_politobot <keyword>`)**:
+  - Single-file resource: Delivers the native document directly to the chat with the official `✅ Verified by PARSI` caption.
+  - Multi-file resource: Sends a structured message with direct Google Drive links for all parts.
+  - Bypasses external redirection so content stays directly in the conversation.
+
+---
+
+## 6. Live Download & Inline Click Analytics Counter (✅ Completed)
+
+### Implementation Overview
+- **Database Architecture**:
+  - Migration `2026_10_18_194500_add_downloads_and_inline_shares_to_resources_table.php` added `downloads_count` and `inline_shares_count`.
+- **Telegram Feedback Tracking**:
+  - Telegram `chosen_inline_result` webhook updates are intercepted in `TelegramUpdateDispatcher`.
+  - Increments `downloads_count` and `inline_shares_count` whenever a user selects a resource button.
+  - Bot private delivery in `CallbackQueryHandler` increments `downloads_count`.
+- **Admin Visibility**:
+  - Total downloads and inline shares displayed in `AdminDashboardController` KPI cards.
+  - Dedicated `Downloads & Shares` column on `/admin/resources` table.
+
+---
+
+## 7. Resource Reporting & Quality Feedback System (Student Flagging)
 
 ### Objective
 Provide a feedback mechanism where students can report issues with downloaded study materials directly within the Telegram bot (e.g., corrupted archives, missing pages, wrong course/year attribution, or inaccurate solutions), alerting administrators instantly for review.
@@ -146,23 +194,16 @@ sequenceDiagram
 
 ### Technical Specification & Architecture
 
-#### 1. Database Schema (`resource_reports` table)
-```php
-Schema::create('resource_reports', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('resource_id')->constrained()->cascadeOnDelete();
-    $table->foreignId('resource_file_id')->nullable()->constrained()->nullOnDelete();
-    $table->foreignId('user_id')->constrained()->cascadeOnDelete(); // Reporting student
-    $table->string('reason', 100); // corrupted, wrong_course, inaccurate_solution, copyright, other
-    $table->text('details')->nullable();
-    $table->enum('status', ['pending', 'resolved', 'dismissed'])->default('pending');
-    $table->foreignId('resolved_by')->nullable()->constrained('users')->nullOnDelete();
-    $table->timestamp('resolved_at')->nullable();
-    $table->timestamps();
-
-    $table->index(['resource_id', 'status']);
-});
-```
+#### 1. Database Schema (`resource_reports` table - ✅ Migrated)
+- `resource_id`: Target academic resource.
+- `resource_file_id`: Specific file reported (if multi-file).
+- `user_id`: Reporting student's Telegram user account.
+- `reason`: Machine-readable category (`corrupted`, `wrong_course`, `inaccurate_solution`, `copyright`, `other`).
+- `details`: Optional user-submitted comment.
+- `status`: `pending` | `resolved` | `dismissed`.
+- `admin_notes`: Resolution feedback.
+- `resolved_by`: Admin user who audited the report.
+- `resolved_at`: Audit timestamp.
 
 #### 2. Telegram Inline Keyboard Integration
 In `CallbackQueryHandler::handleSendResource`, every document sent includes an inline button:
@@ -186,7 +227,7 @@ $this->telegram->sendDocument($chatId, $file->telegram_file_id, $caption, 'HTML'
 
 #### 4. Instant Admin Group Alert
 Sent to `TELEGRAM_ADMIN_CHAT_ID`:
-```
+```html
 🚨 <b>Material Reported by Student</b>
 
 📚 <b>Course:</b> Chemistry (06KWR)
@@ -201,91 +242,9 @@ With inline buttons:
 - `[⛔ Temporarily Suspend]` (callback: `report_suspend_4`)
 - `[✅ Dismiss Report]` (callback: `report_dismiss_4`)
 
-#### 5. Admin Panel Integration
-- **Filter in `/admin/resources`**: Add a filter status `Reported ⚠️` to inspect all flagged items.
-- **Resource Edit View (`edit.blade.php`)**: Display a "User Reports" tab or card showing the full history of reports, reporter usernames, timestamps, and resolution controls.
-- **Quick Stats Counter**: Highlight pending reports on the admin dashboard header.
-
 ---
 
-## 6. Live Log Viewer & Real-Time Monitoring in Admin Panel (`/admin/logs`)
-
-### Objective
-Provide administrators with a real-time, terminal-style live log console directly within the Admin Panel. This enables immediate diagnostics for Telegram webhook events, background queue jobs (Drive uploads, Telegram CDN syncs), Google OAuth token lifecycle, and exceptions without requiring SSH server access.
-
-### Key Capabilities
-1. **Real-Time Stream**:
-   - Server-Sent Events (SSE) streaming `storage/logs/laravel.log` in real time with automatic reconnect.
-   - Zero-polling architecture with low server overhead.
-2. **Filtering & Search**:
-   - **Severity Levels**: Filter by `EMERGENCY`, `CRITICAL`, `ERROR`, `WARNING`, `INFO`, and `DEBUG`.
-   - **Subsystems / Channels**: Filter specifically for `Telegram Webhook`, `Google Drive Sync`, `Moderation Service`, or `Queue Worker`.
-   - **Keyword & Regex Search**: Search instantly by Telegram user ID, file name, resource ID, or error message.
-3. **Console Controls**:
-   - **Pause / Resume**: Freeze log auto-scroll to inspect stack traces during high-traffic periods.
-   - **Auto-scroll toggle**: Keeps console locked to the latest incoming lines when active.
-   - **Clear Console**: Clears the current browser view without altering server log files.
-   - **Download Log**: Direct one-click download of the complete `laravel.log` file.
-   - **Truncate / Rotate**: Admin action to safely archive or truncate current log size.
-
-### Technical Architecture & Implementation
-
-#### 1. Routes (`routes/web.php`)
-```php
-Route::middleware(['auth', 'admin'])->prefix('admin/logs')->name('admin.logs.')->group(function () {
-    Route::get('/', [LogAdminController::class, 'index'])->name('index');
-    Route::get('/stream', [LogAdminController::class, 'stream'])->name('stream');
-    Route::get('/download', [LogAdminController::class, 'download'])->name('download');
-    Route::post('/clear', [LogAdminController::class, 'clear'])->name('clear');
-});
-```
-
-#### 2. Streaming Endpoint (`LogAdminController@stream`)
-Uses Laravel `StreamedResponse` with Server-Sent Events (SSE) reading the tail of `storage/logs/laravel.log`:
-```php
-public function stream(Request $request)
-{
-    return response()->stream(function () {
-        $logPath = storage_path('logs/laravel.log');
-        if (!file_exists($logPath)) {
-            echo "data: " . json_encode(['line' => 'Log file does not exist yet.']) . "\n\n";
-            ob_flush();
-            flush();
-            return;
-        }
-
-        $handle = fopen($logPath, 'r');
-        fseek($handle, -8192, SEEK_END); // Read last 8KB initially
-
-        while (!connection_aborted()) {
-            $line = fgets($handle);
-            if ($line !== false) {
-                echo "data: " . json_encode([
-                    'raw' => trim($line),
-                    'timestamp' => now()->toIso8601String(),
-                ]) . "\n\n";
-                ob_flush();
-                flush();
-            } else {
-                usleep(500000); // 0.5s idle wait
-            }
-        }
-        fclose($handle);
-    }, 200, [
-        'Content-Type' => 'text/event-stream',
-        'Cache-Control' => 'no-cache',
-        'X-Accel-Buffering' => 'no',
-    ]);
-}
-```
-
-#### 3. Console UI (`resources/views/admin/logs/index.blade.php`)
-- **Theme**: Monokai / Dark Terminal styling with high-contrast badge colors (Red for `ERROR`, Yellow for `WARNING`, Cyan for `TELEGRAM`, Green for `SYNC`).
-- **Sidebar Integration**: Added to the admin sidebar navigation under **System** > **Live Logs** with an active ping pulse indicator.
-
----
-
-## 7. Dedicated Reports & Dispute Management Center (`/admin/reports`)
+## 8. Dedicated Reports & Dispute Management Center (`/admin/reports`)
 
 ### Objective
 Establish a centralized, dedicated admin hub (`/admin/reports`) for managing all student-flagged materials, coordinating file remediations, tracking moderation response times, and notifying reporters once issues are resolved.
@@ -304,102 +263,75 @@ stateDiagram-v2
 ```
 
 ### Key Capabilities & UI Specifications
-
-#### 1. Reports Dashboard View (`/admin/reports`)
-- **Metric Cards (KPIs)**:
-  - ⚠️ **Open Reports**: Count of pending items requiring action.
-  - ⏱️ **Average Resolution Time**: Time from report submission to resolution.
-  - 📁 **Top Flagged Courses**: Highlights courses with recurring material quality complaints.
-  - 🛡️ **Resolved This Month**: Count of successfully remediated materials.
-- **Filter Bar**:
-  - Filter by Status: `Pending`, `Resolved`, `Dismissed`.
-  - Filter by Reason: `Corrupted Archive`, `Wrong Course/Year`, `Inaccurate Solution`, `Copyright/Inappropriate`, `Other`.
-  - Search by Course Code (e.g. `06KWR`), Course Title, or Reporter Telegram Username.
-
-#### 2. Moderation & Remediation Action Controls
-Every report entry provides inline one-click operations:
-1. **[🔍 Inspect Resource]**: Opens the resource edit page showing course associations, files, and download statistics.
-2. **[📥 Download Current File]**: Quickly verifies the issue locally (downloads via local disk, Google Drive, or Telegram CDN).
-3. **[🔄 Replace File In-Place]**: Modal dialog allowing direct drag-and-drop replacement of the corrupted file, automatically triggering re-sync to Google Drive and Telegram CDN.
-4. **[⛔ Toggle Publish Status]**: Immediately unpublishes the resource (`is_active = 0`) to safeguard students from downloading bad materials while review is underway.
-5. **[✅ Resolve & Notify Student]**:
-   - Updates report status to `resolved`.
-   - Records `resolved_by` (admin ID) and `resolved_at`.
-   - Automatically dispatches a Telegram message to the reporting student:
-     > *"🎓 **PARSI Educational Bot**\n\nDear student, the issue you reported regarding **{resource_title}** ({course_name}) has been resolved by our academic team. Thank you for helping keep our community materials accurate and high-quality!"*
-6. **[❌ Dismiss Report]**:
-   - Closes false alarms with an internal moderator note (e.g., "Tested file; archive opens normally on Windows/Mac").
-
-#### 3. Database Schema Reference
-Integrated with the `resource_reports` table detailed in Section 5:
-- `resource_id`: Target academic resource.
-- `resource_file_id`: Specific file reported (if multi-file).
-- `user_id`: Reporting student's Telegram user account.
-- `reason`: Machine-readable category (`corrupted`, `wrong_course`, `inaccurate_solution`, `copyright`, `other`).
-- `details`: Optional user-submitted comment or timestamp of the issue.
-- `status`: `pending` | `resolved` | `dismissed`.
-- `resolved_by`: Admin user who audited the report.
-- `resolved_at`: Audit timestamp.
-
-#### 4. Navigation & Badge Notifications
-- **Sidebar Badge**: In [`resources/views/layouts/admin.blade.php`](file:///d:/Polito/PARSI/projects/parsi_polito_bot/resources/views/layouts/admin.blade.php), add `Reports` under the **Content** section with a real-time badge showing the number of `pending` reports:
-  ```blade
-  <a href="{{ route('admin.reports.index') }}" class="nav-link">
-      <i class="fas fa-flag text-danger"></i>
-      <span>Reports</span>
-      @if($pendingReportsCount > 0)
-          <span class="badge bg-danger ms-auto">{{ $pendingReportsCount }}</span>
-      @endif
-  </a>
-  ```
+1. **Reports Dashboard View (`/admin/reports`)**:
+   - ⚠️ **Open Reports**: Count of pending items requiring action.
+   - 📁 **Top Flagged Courses**: Highlights courses with recurring material quality complaints.
+   - 🛡️ **Resolved History**: Count of remediated materials.
+   - Filter by Status (`Pending`, `Resolved`, `Dismissed`) and Reason.
+2. **Moderation & Remediation Controls**:
+   - `[🔍 Inspect Resource]`: Jump to edit page.
+   - `[📥 Download Current File]`: Verify locally.
+   - `[⛔ Suspend / Republish]`: Toggle resource status.
+   - `[✅ Resolve & Notify Student]`: Marks resolved and sends notification message to the reporting student on Telegram.
+   - `[❌ Dismiss Report]`: Closes with an internal moderator note.
 
 ---
 
-## 8. High-Speed Performance Optimization & Sub-Second Latency Architecture
+## 9. Live Log Viewer & Real-Time Monitoring in Admin Panel (`/admin/logs`)
 
 ### Objective
-Ensure ultra-fast, snappy interaction times (< 250ms for Telegram bot navigation and admin panel loads) by minimizing database roundtrips, eliminating N+1 query bottlenecks, caching static catalog relationships, and offloading heavy tasks to asynchronous background queues.
+Provide administrators with a real-time, terminal-style live log console directly within the Admin Panel. Enables immediate diagnostics for Telegram webhook events, background queue jobs, and API calls without needing SSH terminal access.
+
+### Key Capabilities
+1. **Real-Time Stream**:
+   - Server-Sent Events (SSE) streaming `storage/logs/laravel.log` in real time with automatic reconnect.
+2. **Filtering & Search**:
+   - Filter by `ERROR`, `WARNING`, `INFO`, `DEBUG`.
+   - Subsystem filtering: `Telegram Webhook`, `Google Drive Sync`, `Moderation Service`.
+3. **Console Controls**:
+   - Pause/Resume auto-scroll.
+   - One-click clear view and log file download.
+
+---
+
+## 10. Student Informational Sections (EDISU, Deadlines, Support)
+
+### Objective
+Replace placeholder responses in the student bot main menu with interactive, helpful academic support services:
+1. **`🔍 Edisu`**:
+   - Quick guide on scholarship requirements, canteen access, accommodation rankings, and ISEE Parificato links.
+2. **`❓ Important Deadlines`**:
+   - Key dates for tuition installments, study plan submission deadlines, and official PoliTO exam sessions.
+3. **`⚠️ Contact / Report`**:
+   - Direct button to submit feedback or connect with the PARSI academic committee.
+
+---
+
+## 11. High-Speed Performance Optimization & Sub-Second Latency
 
 ### Performance Bottlenecks & Targets
 | Metric | Current State | Target State | Optimization Technique |
 | :--- | :--- | :--- | :--- |
-| **Bot Menu Navigation** | 450ms – 1,200ms | **< 150ms** | In-memory Redis/File caching of Programs, Years, & Courses |
-| **Resource Catalog Listing** | 800ms (N+1 queries) | **< 120ms** | Eager-loading relationships (`with(['course', 'files'])`) |
-| **File Upload Response** | Synchronous upload wait | **Immediate (< 200ms)** | Async queue jobs for Drive sync & Telegram CDN forwarding |
-| **Admin Panel Page Load** | 350ms – 700ms | **< 100ms** | Indexing `(status, course_id)`, cached metrics |
+| **Bot Menu Navigation** | ~250ms – 400ms | **< 150ms** | In-memory caching of Programs, Years, & Courses |
+| **Resource Catalog Listing** | Eager-loaded (2 queries) | **< 100ms** | `with(['course', 'resourceType', 'files'])` |
+| **Inline Query Search** | Live SQL search | **< 120ms** | Indexed title/code queries + 30s cache headers |
+| **Telegram API Calls** | Safe cURL client (timeouts + proxy) | **Resilient** | Configurable proxy (`TELEGRAM_PROXY`), non-blocking callbacks |
 
-### Multi-Tier Optimization Architecture
+---
 
-#### 1. In-Memory Catalog Caching
-Courses, programmes, and academic years change infrequently. Caching their hierarchical structure in memory avoids repeated SQL queries during student navigation:
-- `Cache::remember('catalog.programs', 86400, ...)`
-- `Cache::remember('catalog.years', 86400, ...)`
-- `Cache::remember("catalog.courses.program_{$programId}_year_{$year}", 86400, ...)`
-- **Cache Invalidation:** Automatically flush catalog cache tags upon create/update/delete in `CourseAdminController`, `ProgramAdminController`, and `AcademicYearAdminController`.
+## 📋 Immediate Execution Order
 
-#### 2. Eager-Loading Elimination of N+1 Queries
-All resource queries must explicitly eager-load related models:
-```php
-// Optimized: 2 total queries instead of 1 + 2N
-$resources = Resource::with(['course:id,name,code', 'resourceType:id,name', 'files'])
-    ->where('is_active', true)
-    ->paginate(15);
-```
-
-#### 3. Database Indexing
-Add composite indexes on high-throughput query columns:
-```php
-$table->index(['is_active', 'created_at']);
-$table->index(['course_id', 'is_active']);
-$table->index(['status', 'user_id']);
-```
-
-#### 4. Asynchronous Queue Processing for External Cloud APIs
-Never perform blocking HTTP calls to Google Drive API or Telegram Bot API within the student's synchronous request lifecycle:
-- Student receives instant "Upload received! 🚀 Processing..." message.
-- `UploadResourceFileJob` runs in background via database/redis queue.
-
-#### 5. Telegram Webhook Nonce & Early Return
-Respond immediately with HTTP 200 OK to Telegram webhook calls after validating signature and dispatching jobs, ensuring Telegram never retries webhook deliveries due to timeouts.
-
-
+1. **Phase 1: Admin Reports Section (`/admin/reports`) & In-Bot Report Button** ✅ **(COMPLETED)**
+   - `resource_reports` integrated with full CRUD/action management (`ReportAdminController`).
+   - Admin UI (`index.blade.php`, `show.blade.php`) with real-time pending badge in navbar.
+   - RBAC scoping: Super Admin & Moderator have full control; Major Admin/Professor scoped to their major; Viewer read-only.
+   - Telegram inline buttons `[⚠️ Report Material]` on document deliveries and Google Drive links.
+   - Full automated test suite in `tests/Feature/ReportAdminTest.php` passing 100%.
+2. **Phase 2: Admin Live Log Viewer (`/admin/logs`)**
+   - Build SSE log streaming controller and dark terminal view.
+3. **Phase 3: Automated Archival to Telegram Storage Channel**
+   - Forward approved community submissions to `TELEGRAM_STORAGE_CHANNEL_ID` and save message IDs.
+4. **Phase 4: Google Drive Batch Sync**
+   - Add batch upload retry endpoint and UI button in Admin Panel.
+5. **Phase 5: Informational Sections (EDISU, Deadlines, Support)**
+   - Fill static and dynamic guides for PoliTO student support.

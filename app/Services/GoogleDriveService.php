@@ -176,4 +176,37 @@ class GoogleDriveService
             return null;
         }
     }
+
+    /**
+     * Delete a file from Google Drive by its file ID.
+     */
+    public function deleteFile(string $fileId): bool
+    {
+        if (! $this->isConfigured()) {
+            return false;
+        }
+
+        // 1. Attempt permanent deletion first
+        try {
+            $this->driveService->files->delete($fileId, ['supportsAllDrives' => true]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Google Drive permanent delete failed, attempting trash fallback: '.$e->getMessage(), ['fileId' => $fileId]);
+        }
+
+        // 2. Fallback: Move to Trash (useful when account is editor or lacks hard delete privileges in Shared Drives)
+        try {
+            $trashUpdate = new DriveFile(['trashed' => true]);
+            $this->driveService->files->update($fileId, $trashUpdate, [
+                'supportsAllDrives' => true,
+            ]);
+
+            return true;
+        } catch (\Throwable $trashError) {
+            Log::error('Google Drive trash fallback also failed: '.$trashError->getMessage(), ['fileId' => $fileId]);
+
+            return false;
+        }
+    }
 }
