@@ -844,8 +844,23 @@ class CallbackQueryHandler
                 ],
             ];
 
+            $isPhoto = str_starts_with($file->mime_type ?? '', 'image/')
+                || in_array(strtolower(pathinfo($file->original_filename ?? '', PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp']);
+
             try {
-                $response = $this->telegram->sendDocument($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup);
+                $response = $isPhoto
+                    ? $this->telegram->sendPhoto($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup)
+                    : $this->telegram->sendDocument($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup);
+
+                if (! $response->json('ok')) {
+                    $description = $response->json('description') ?? '';
+                    if (str_contains($description, 'Photo as Document')) {
+                        $response = $this->telegram->sendPhoto($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup);
+                    } elseif (str_contains($description, 'Document as Photo')) {
+                        $response = $this->telegram->sendDocument($chatId, $file->telegram_file_id, $fileCaption, 'HTML', $fileMarkup);
+                    }
+                }
+
                 if ($response->json('ok')) {
                     $sentTgCount++;
                 } else {
