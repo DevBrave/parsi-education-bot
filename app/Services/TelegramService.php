@@ -244,26 +244,51 @@ class TelegramService
             $payload['parse_mode'] = $parseMode;
         }
 
-        $response = $this->client(120, 15)
-            ->attach('document', file_get_contents($filePath), $filename)
-            ->post("{$this->baseUrl}/sendDocument", $payload);
-
-        if (! $response->json('ok')) {
-            bot_log('telegram')->error('Telegram uploadDocument failed', [
-                'chat_id' => $chatId,
-                'response' => $response->json(),
-            ]);
-
+        if (! file_exists($filePath)) {
+            bot_log('telegram')->error("uploadDocument file not found: {$filePath}");
             return null;
         }
 
-        $document = $response->json('result.document');
+        $stream = fopen($filePath, 'r');
+        if (! $stream) {
+            bot_log('telegram')->error("uploadDocument failed to open file stream: {$filePath}");
+            return null;
+        }
 
-        return [
-            'file_id' => $document['file_id'] ?? null,
-            'file_unique_id' => $document['file_unique_id'] ?? null,
-            'message_id' => $response->json('result.message_id'),
-        ];
+        try {
+            // 360-second timeout for large files (up to 50MB) over international networks
+            $response = $this->client(360, 20)
+                ->attach('document', $stream, $filename)
+                ->post("{$this->baseUrl}/sendDocument", $payload);
+
+            if (! $response->json('ok')) {
+                bot_log('telegram')->error('Telegram uploadDocument failed', [
+                    'chat_id' => $chatId,
+                    'response' => $response->json(),
+                ]);
+
+                return null;
+            }
+
+            $document = $response->json('result.document');
+
+            return [
+                'file_id' => $document['file_id'] ?? null,
+                'file_unique_id' => $document['file_unique_id'] ?? null,
+                'message_id' => $response->json('result.message_id'),
+            ];
+        } catch (\Throwable $e) {
+            bot_log('telegram')->error('Telegram uploadDocument exception: '.$e->getMessage(), [
+                'chat_id' => $chatId,
+                'filename' => $filename,
+            ]);
+
+            return null;
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
     }
 
     /**

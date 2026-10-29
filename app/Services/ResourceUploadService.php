@@ -61,18 +61,25 @@ class ResourceUploadService
                 $formattedCaption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
             }
 
-            $tgResult = $this->telegramService->uploadDocument(
-                chatId: $storageChannelId,
-                filePath: $fullPath,
-                filename: $resourceFile->original_filename,
-                caption: $formattedCaption,
-            );
+            $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
+            $tgResult = null;
 
-            if (! $tgResult || empty($tgResult['file_id'])) {
-                bot_log('telegram')->error("Failed to upload ResourceFile #{$resourceFile->id} to Telegram");
-                $resourceFile->resource?->update(['status' => 'rejected']);
+            // Telegram Bot API has a 50MB (52,428,800 bytes) hard limit for bot uploads.
+            // If the file exceeds 49.5MB, skip Telegram upload and route directly to Google Drive.
+            if ($fileSizeBytes > 0 && $fileSizeBytes <= 49 * 1024 * 1024) {
+                $tgResult = $this->telegramService->uploadDocument(
+                    chatId: $storageChannelId,
+                    filePath: $fullPath,
+                    filename: $resourceFile->original_filename,
+                    caption: $formattedCaption,
+                );
+            } else {
+                bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>49MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
+            }
 
-                return false;
+            $hasTgFile = ! empty($tgResult['file_id']);
+            if (! $hasTgFile) {
+                bot_log('telegram')->warning("Telegram upload omitted or failed for ResourceFile #{$resourceFile->id}, proceeding to Google Drive fallback.");
             }
 
             // 2. Upload to Google Drive (only if approved and not already synced)
@@ -97,9 +104,18 @@ class ResourceUploadService
                 }
             }
 
+            // If neither Telegram nor Google Drive received the file, mark rejected and abort
+            if (! $hasTgFile && ! $driveFileId) {
+                bot_log('telegram')->error("Failed to sync ResourceFile #{$resourceFile->id}: both Telegram and Google Drive were unavailable.");
+                $resourceFile->resource?->update(['status' => 'rejected']);
+                Storage::disk('local')->delete($storedPath);
+
+                return false;
+            }
+
             // 3. Update ResourceFile with external IDs and clear local path
             $resourceFile->update([
-                'telegram_file_id' => $tgResult['file_id'],
+                'telegram_file_id' => $tgResult['file_id'] ?? null,
                 'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
                 'telegram_message_id' => $tgResult['message_id'] ?? null,
                 'drive_file_id' => $driveFileId,
@@ -109,7 +125,7 @@ class ResourceUploadService
             // 4. Remove temporary file from local VPS disk to conserve storage
             Storage::disk('local')->delete($storedPath);
 
-            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced to Telegram" . ($driveFileId ? " and Google Drive" : " (pending Drive sync on approval)") . ".");
+            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: " . ($hasTgFile ? "yes" : "no") . ", Drive: " . ($driveFileId ? "yes" : "no") . ").");
 
             return true;
         } catch (\Throwable $e) {
