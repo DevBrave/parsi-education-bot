@@ -30,7 +30,7 @@ class ResourceUploadService
         $fullPath = Storage::disk('local')->path($storedPath);
 
         if (! file_exists($fullPath)) {
-            Log::error("Resource file does not exist on disk: {$fullPath}");
+            bot_log('telegram')->error("Resource file does not exist on disk: {$fullPath}");
             $resourceFile->resource?->delete();
 
             return false;
@@ -69,7 +69,7 @@ class ResourceUploadService
             );
 
             if (! $tgResult || empty($tgResult['file_id'])) {
-                Log::error("Failed to upload ResourceFile #{$resourceFile->id} to Telegram");
+                bot_log('telegram')->error("Failed to upload ResourceFile #{$resourceFile->id} to Telegram");
                 $resourceFile->resource?->update(['status' => 'rejected']);
 
                 return false;
@@ -93,7 +93,7 @@ class ResourceUploadService
                         folderId: $folderId,
                     );
                 } catch (\Throwable $driveError) {
-                    Log::warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
+                    bot_log('drive')->warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
                 }
             }
 
@@ -109,11 +109,11 @@ class ResourceUploadService
             // 4. Remove temporary file from local VPS disk to conserve storage
             Storage::disk('local')->delete($storedPath);
 
-            Log::info("Resource #{$resourceFile->resource_id} successfully synced to Telegram" . ($driveFileId ? " and Google Drive" : " (pending Drive sync on approval)") . ".");
+            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced to Telegram" . ($driveFileId ? " and Google Drive" : " (pending Drive sync on approval)") . ".");
 
             return true;
         } catch (\Throwable $e) {
-            Log::error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
+            bot_log('telegram')->error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
             $resourceFile->resource?->update(['status' => 'rejected']);
             // Clean up temporary local file on failure
             Storage::disk('local')->delete($storedPath);

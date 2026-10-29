@@ -49,7 +49,7 @@ class FinalizeSubmissionJob implements ShouldQueue
         // Send confirmation to the student
         $lang = $user->preferred_language ?? 'en';
         $courseName = $resource->course ? e($resource->course->name) : 'Course';
-        $count = $resource->files->count();
+        $count = $resource->files()->count();
 
         $telegram->sendMessage(
             $this->chatId,

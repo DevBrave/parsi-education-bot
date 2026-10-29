@@ -36,10 +36,12 @@ class TelegramDocumentTest extends TestCase
     public function test_telegram_failure_is_logged_and_returned(): void
     {
         Http::fake(['*' => Http::response(['ok' => false, 'description' => 'Invalid file'], 400)]);
-        Log::shouldReceive('error')->once()->with('Telegram sendDocument failed', [
+        $channelMock = \Mockery::mock();
+        $channelMock->shouldReceive('error')->once()->with('Telegram sendDocument failed', [
             'chat_id' => 42,
             'description' => 'Invalid file',
         ]);
+        Log::shouldReceive('channel')->with('telegram')->andReturn($channelMock);
 
         $response = app(TelegramService::class)->sendDocument(42, 'invalid-file');
 
@@ -314,22 +316,22 @@ class TelegramDocumentTest extends TestCase
 
         $this->assertTrue($adminTelegramRequests->isNotEmpty(), 'An admin notification should have been sent to Telegram.');
 
-        $firstPair = $adminTelegramRequests->first();
-        $adminRequest = $firstPair[0];
-        $adminPayload = $adminRequest->data();
-        $sentCaption = $adminPayload['caption'] ?? $adminPayload['text'] ?? '';
+        $adminMessages = $adminTelegramRequests->map(function ($pair) {
+            $data = $pair[0]->data();
+            return $data['caption'] ?? $data['text'] ?? '';
+        })->implode("\n");
 
         // Assert the caption sent to Telegram contains the Title, Description, and filenames
-        $this->assertStringContainsString('📚 Complete Algorithms 2025 Notes', $sentCaption);
-        $this->assertStringContainsString('algorithms_lecture_part1.pdf', $sentCaption);
-        $this->assertStringContainsString('algorithms_lecture_part2.pdf', $sentCaption);
+        $this->assertStringContainsString('📚 Complete Algorithms 2025 Notes', $adminMessages);
+        $this->assertStringContainsString('algorithms_lecture_part1.pdf', $adminMessages);
+        $this->assertStringContainsString('algorithms_lecture_part2.pdf', $adminMessages);
 
         echo PHP_EOL . "--- RESULT OF ALBUM UPLOAD TEST ---" . PHP_EOL;
         echo "Extracted Resource Title: " . $resource->title . PHP_EOL;
         echo "Extracted Resource Description: " . $resource->description . PHP_EOL;
         echo "Total Attached Files: " . $resource->files->count() . PHP_EOL;
         echo "Telegram Channel/Admin Notification:" . PHP_EOL;
-        echo $sentCaption . PHP_EOL;
+        echo $adminMessages . PHP_EOL;
         echo "-----------------------------------" . PHP_EOL;
     }
 

@@ -44,7 +44,7 @@ class UploadResourceFileJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error("UploadResourceFileJob failed for ResourceFile #{$this->resourceFile->id}: {$exception->getMessage()}");
+        bot_log('drive')->error("UploadResourceFileJob failed for ResourceFile #{$this->resourceFile->id}: {$exception->getMessage()}");
 
         // Clean up temporary local file
         Storage::disk('local')->delete($this->storedPath);

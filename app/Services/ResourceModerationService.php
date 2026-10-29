@@ -28,7 +28,7 @@ class ResourceModerationService
             'reviewed_at' => now(),
         ]);
 
-        Log::info("Resource #{$resource->id} approved by user #{$reviewer->id} ({$reviewer->username})");
+        log_rbac("Resource #{$resource->id} ('{$resource->title}') approved", $reviewer, ['resource_id' => $resource->id]);
 
         // 1. Send approved files to Telegram storage channel (excluding any specified file IDs)
         $this->sendToStorageChannel($resource, $excludeFileIds);
@@ -53,7 +53,10 @@ class ResourceModerationService
             'reviewed_at' => now(),
         ]);
 
-        Log::info("Resource #{$resource->id} rejected by user #{$reviewer->id} ({$reviewer->username})");
+        log_rbac("Resource #{$resource->id} ('{$resource->title}') rejected", $reviewer, [
+            'resource_id' => $resource->id,
+            'reason' => $reason,
+        ]);
 
         // Notify the submitting student via Telegram
         $this->notifySubmitter($resource, 'rejected');
@@ -84,7 +87,7 @@ class ResourceModerationService
         try {
             $this->telegram->sendMessage($submitter->telegram_user_id, $message, null, 'HTML');
         } catch (\Throwable $e) {
-            Log::warning("Failed to send moderation notification to submitter #{$submitter->id}: {$e->getMessage()}");
+            bot_log('telegram')->warning("Failed to send moderation notification to submitter #{$submitter->id}: {$e->getMessage()}");
         }
     }
 
@@ -94,6 +97,9 @@ class ResourceModerationService
      */
     protected function syncDrive(Resource $resource, array $excludeFileIds = []): void
     {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '600');
+
         if (! $this->driveService->isConfigured()) {
             return;
         }
@@ -144,7 +150,7 @@ class ResourceModerationService
                         $file->update([
                             'drive_file_id' => $driveFileId,
                         ]);
-                        Log::info("ResourceFile #{$file->id} synced to Google Drive with ID: {$driveFileId}");
+                        bot_log('drive')->info("ResourceFile #{$file->id} synced to Google Drive with ID: {$driveFileId}");
                     }
                 }
 
@@ -153,7 +159,7 @@ class ResourceModerationService
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning("Drive sync on moderation for Resource #{$resource->id} encountered an error: {$e->getMessage()}");
+            bot_log('drive')->warning("Drive sync on moderation for Resource #{$resource->id} encountered an error: {$e->getMessage()}");
         }
     }
 
@@ -211,9 +217,9 @@ class ResourceModerationService
                     $file->update(['telegram_message_id' => $msgId]);
                 }
 
-                Log::info("ResourceFile #{$file->id} dispatched to Telegram storage channel {$storageChannelId} (message #{$msgId})");
+                bot_log('telegram')->info("ResourceFile #{$file->id} dispatched to Telegram storage channel {$storageChannelId} (message #{$msgId})");
             } catch (\Throwable $e) {
-                Log::warning("Failed to send ResourceFile #{$file->id} to storage channel: " . $e->getMessage());
+                bot_log('telegram')->warning("Failed to send ResourceFile #{$file->id} to storage channel: " . $e->getMessage());
             }
         }
     }

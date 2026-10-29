@@ -24,7 +24,11 @@ class TelegramService
      */
     protected function client(int $timeout = 15, int $connectTimeout = 8): PendingRequest
     {
-        $client = Http::timeout($timeout)->connectTimeout($connectTimeout);
+        $client = Http::timeout($timeout)
+            ->connectTimeout($connectTimeout)
+            ->withHeaders([
+                'Connection' => 'keep-alive',
+            ]);
 
         $proxy = config('telegram.proxy') ?: env('TELEGRAM_PROXY') ?: env('HTTPS_PROXY') ?: env('HTTP_PROXY');
         if (! empty($proxy)) {
@@ -56,7 +60,7 @@ class TelegramService
         $response = $this->client()->post("{$this->baseUrl}/sendMessage", $payload);
 
         if ($response->failed()) {
-            Log::error('Telegram sendMessage failed', [
+            bot_log('telegram')->error('Telegram sendMessage failed', [
                 'chat_id' => $chatId,
                 'status' => $response->status(),
                 'response' => $response->json(),
@@ -73,7 +77,7 @@ class TelegramService
     {
         $payload = [
             'url' => $url,
-            'allowed_updates' => ['message', 'callback_query', 'inline_query'],
+            'allowed_updates' => ['message', 'callback_query', 'inline_query', 'chosen_inline_result'],
         ];
 
         if ($secretToken !== null) {
@@ -115,7 +119,7 @@ class TelegramService
         $response = $this->client()->post("{$this->baseUrl}/editMessageText", $payload);
 
         if ($response->failed()) {
-            Log::error('Telegram editMessageText failed', [
+            bot_log('telegram')->error('Telegram editMessageText failed', [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
                 'status' => $response->status(),
@@ -150,7 +154,7 @@ class TelegramService
         $response = $this->client()->post("{$this->baseUrl}/editMessageCaption", $payload);
 
         if ($response->failed()) {
-            Log::error('Telegram editMessageCaption failed', [
+            bot_log('telegram')->error('Telegram editMessageCaption failed', [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
                 'status' => $response->status(),
@@ -177,7 +181,7 @@ class TelegramService
         try {
             return $this->client(5, 3)->post("{$this->baseUrl}/answerCallbackQuery", $payload);
         } catch (\Throwable $e) {
-            Log::warning('Telegram answerCallbackQuery failed or timed out: '.$e->getMessage(), [
+            bot_log('telegram')->warning('Telegram answerCallbackQuery failed or timed out: '.$e->getMessage(), [
                 'callback_query_id' => $callbackQueryId,
             ]);
 
@@ -188,7 +192,7 @@ class TelegramService
     /**
      * Answer an inline query (for typing @botusername query in any chat).
      */
-    public function answerInlineQuery(string $inlineQueryId, array $results, int $cacheTime = 60): ?Response
+    public function answerInlineQuery(string $inlineQueryId, array $results, int $cacheTime = 60, bool $isPersonal = false): ?Response
     {
         $payload = [
             'inline_query_id' => $inlineQueryId,
@@ -196,10 +200,14 @@ class TelegramService
             'cache_time' => $cacheTime,
         ];
 
+        if ($isPersonal) {
+            $payload['is_personal'] = true;
+        }
+
         try {
             $response = $this->client(5, 3)->post("{$this->baseUrl}/answerInlineQuery", $payload);
             if (! $response->json('ok')) {
-                Log::error('Telegram answerInlineQuery rejected by Telegram API', [
+                bot_log('telegram')->error('Telegram answerInlineQuery rejected by Telegram API', [
                     'inline_query_id' => $inlineQueryId,
                     'status' => $response->status(),
                     'response' => $response->json(),
@@ -208,7 +216,7 @@ class TelegramService
 
             return $response;
         } catch (\Throwable $e) {
-            Log::warning('Telegram answerInlineQuery failed: '.$e->getMessage(), [
+            bot_log('telegram')->warning('Telegram answerInlineQuery failed: '.$e->getMessage(), [
                 'inline_query_id' => $inlineQueryId,
             ]);
 
@@ -241,7 +249,7 @@ class TelegramService
             ->post("{$this->baseUrl}/sendDocument", $payload);
 
         if (! $response->json('ok')) {
-            Log::error('Telegram uploadDocument failed', [
+            bot_log('telegram')->error('Telegram uploadDocument failed', [
                 'chat_id' => $chatId,
                 'response' => $response->json(),
             ]);
@@ -284,7 +292,7 @@ class TelegramService
 
         $response = $this->client()->post("{$this->baseUrl}/sendDocument", $payload);
         if (! $response->json('ok')) {
-            Log::error('Telegram sendDocument failed', [
+            bot_log('telegram')->error('Telegram sendDocument failed', [
                 'chat_id' => $chatId,
                 'description' => $response->json('description'),
             ]);
@@ -319,8 +327,35 @@ class TelegramService
 
         $response = $this->client()->post("{$this->baseUrl}/sendPhoto", $payload);
         if (! $response->json('ok')) {
-            Log::error('Telegram sendPhoto failed', [
+            bot_log('telegram')->error('Telegram sendPhoto failed', [
                 'chat_id' => $chatId,
+                'description' => $response->json('description'),
+            ]);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Send a group of photos or documents as an album (sendMediaGroup).
+     *
+     * @param int|string $chatId
+     * @param array $media Array of InputMedia items (2 to 10 items)
+     * @return Response
+     */
+    public function sendMediaGroup(int|string $chatId, array $media): Response
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'media' => $media,
+        ];
+
+        $response = $this->client(120, 15)->post("{$this->baseUrl}/sendMediaGroup", $payload);
+
+        if (! $response->json('ok')) {
+            bot_log('telegram')->error('Telegram sendMediaGroup failed', [
+                'chat_id' => $chatId,
+                'status' => $response->status(),
                 'description' => $response->json('description'),
             ]);
         }
@@ -346,7 +381,7 @@ class TelegramService
             return $response->json('result');
         }
 
-        Log::error('Telegram getFile failed', [
+        bot_log('telegram')->error('Telegram getFile failed', [
             'file_id' => $fileId,
             'response' => $response->json(),
         ]);
@@ -371,9 +406,9 @@ class TelegramService
             'chat_id' => $chatId,
             'message_id' => $messageId,
         ]);
-
+        
         if (! $response->json('ok')) {
-            Log::warning('Telegram deleteMessage failed', [
+            $this->log('warning', 'Telegram deleteMessage failed', [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
                 'response' => $response->json(),
@@ -381,5 +416,13 @@ class TelegramService
         }
 
         return $response;
+    }
+
+    /**
+     * Log to the dedicated telegram channel.
+     */
+    protected function log(string $level, string $message, array $context = []): void
+    {
+        bot_log('telegram')->$level($message, $context);
     }
 }

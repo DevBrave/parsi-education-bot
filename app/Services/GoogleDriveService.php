@@ -31,14 +31,14 @@ class GoogleDriveService
                 $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
 
                 if (! empty($token['error'])) {
-                    Log::warning('Google Drive refresh token invalid or expired: ' . ($token['error_description'] ?? $token['error']));
+                    bot_log('drive')->warning('Google Drive refresh token invalid or expired: ' . ($token['error_description'] ?? $token['error']));
                 } else {
                     $this->driveService = new GoogleDrive($client);
 
                     return;
                 }
             } catch (\Throwable $e) {
-                Log::error('Failed to initialize Google Drive OAuth client: '.$e->getMessage());
+                bot_log('drive')->error('Failed to initialize Google Drive OAuth client: '.$e->getMessage());
             }
         }
 
@@ -51,7 +51,7 @@ class GoogleDriveService
                 $client->addScope(GoogleDrive::DRIVE);
                 $this->driveService = new GoogleDrive($client);
             } catch (\Throwable $e) {
-                Log::error('Failed to initialize Google Drive client: '.$e->getMessage());
+                bot_log('drive')->error('Failed to initialize Google Drive client: '.$e->getMessage());
             }
         }
     }
@@ -113,7 +113,7 @@ class GoogleDriveService
 
             return $createdFolder->id;
         } catch (\Throwable $e) {
-            Log::warning("Failed to get or create Google Drive folder '{$folderName}': ".$e->getMessage());
+            bot_log('drive')->warning("Failed to get or create Google Drive folder '{$folderName}': ".$e->getMessage());
 
             return $parent;
         }
@@ -125,8 +125,12 @@ class GoogleDriveService
      */
     public function uploadFile(string $filePath, string $filename, string $mimeType, ?string $folderId = null): ?string
     {
+        // Prevent 30-second PHP script timeout during large file uploads to Google Drive
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '600');
+
         if (! $this->isConfigured()) {
-            Log::warning('Google Drive is not configured. Skipping Drive upload for: '.$filename);
+            bot_log('drive')->warning('Google Drive is not configured. Skipping Drive upload for: '.$filename);
 
             return null;
         }
@@ -164,12 +168,12 @@ class GoogleDriveService
                     'supportsAllDrives' => true,
                 ]);
             } catch (\Throwable $permError) {
-                Log::warning('Could not set public view permission on Google Drive file: '.$permError->getMessage());
+                bot_log('drive')->warning('Could not set public view permission on Google Drive file: '.$permError->getMessage());
             }
 
             return $uploadedFile->id;
         } catch (\Throwable $e) {
-            Log::error('Google Drive file upload failed: '.$e->getMessage(), [
+            bot_log('drive')->error('Google Drive file upload failed: '.$e->getMessage(), [
                 'filename' => $filename,
             ]);
 
@@ -192,7 +196,7 @@ class GoogleDriveService
 
             return true;
         } catch (\Throwable $e) {
-            Log::warning('Google Drive permanent delete failed, attempting trash fallback: '.$e->getMessage(), ['fileId' => $fileId]);
+            bot_log('drive')->warning('Google Drive permanent delete failed, attempting trash fallback: '.$e->getMessage(), ['fileId' => $fileId]);
         }
 
         // 2. Fallback: Move to Trash (useful when account is editor or lacks hard delete privileges in Shared Drives)
@@ -202,11 +206,21 @@ class GoogleDriveService
                 'supportsAllDrives' => true,
             ]);
 
+            $this->log('info', 'Google Drive file moved to trash', ['fileId' => $fileId]);
+
             return true;
         } catch (\Throwable $trashError) {
-            Log::error('Google Drive trash fallback also failed: '.$trashError->getMessage(), ['fileId' => $fileId]);
+            $this->log('error', 'Google Drive trash fallback also failed: '.$trashError->getMessage(), ['fileId' => $fileId]);
 
             return false;
         }
+    }
+
+    /**
+     * Log to the dedicated drive channel.
+     */
+    protected function log(string $level, string $message, array $context = []): void
+    {
+        bot_log('drive')->$level($message, $context);
     }
 }
