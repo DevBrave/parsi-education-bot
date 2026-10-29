@@ -14,9 +14,9 @@
 | **2** | **Telegram Storage Channel Auto-Archival** | 🟡 Ready for Wiring | `ResourceModerationService`, Telegram CDN | High |
 | **3** | **Automated Malware & Antivirus Scanner** | ⏳ Planned | `FileUploadHandler`, Security Pipeline | Medium |
 | **4** | **Community vs. Official Resource Distinctions** | ✅ **Completed** | Admin Views, Eloquent Models, Filters | Done |
-| **5** | **Student Issue Reporting via Telegram Bot** | 🟡 In Progress | Bot Keyboards, Handlers, `resource_reports` | High |
-| **6** | **Live Log Viewer & Real-Time Monitoring** | ⏳ Planned | `/admin/logs`, SSE Streaming, Console UI | Medium |
-| **7** | **Dedicated Reports Center (`/admin/reports`)** | 🟡 In Progress | ReportAdminController, Blade Views | High |
+| **5** | **Student Issue Reporting via Telegram Bot** | ✅ **Completed** | Bot Keyboards, Handlers, `resource_reports` | Done |
+| **6** | **Live Log Viewer & Real-Time Monitoring** | ✅ **Completed** | `/admin/logs`, SSE Streaming, Console UI | Done |
+| **7** | **Dedicated Reports Center (`/admin/reports`)** | ✅ **Completed** | ReportAdminController, Blade Views | Done |
 | **8** | **Performance & Latency Optimization** | 🟡 Partial | Caching, Eager-Loading, Timeout Tuning | Medium |
 | **9** | **In-Chat, Group & Inline Query Search Engine** | ✅ **Completed** | `InlineQueryHandler`, Group Mention, Direct Send | Done |
 | **10**| **Live Download & Inline Click Analytics Counter**| ✅ **Completed** | `chosen_inline_result`, Admin KPI & Table | Done |
@@ -326,11 +326,14 @@ Replace placeholder responses in the student bot main menu with interactive, hel
    - Admin UI (`index.blade.php`, `show.blade.php`) with real-time pending badge in navbar.
    - RBAC scoping: Super Admin & Moderator have full control; Major Admin/Professor scoped to their major; Viewer read-only.
    - Telegram inline buttons `[⚠️ Report Material]` on document deliveries and Google Drive links.
-   - Full automated test suite in `tests/Feature/ReportAdminTest.php` passing 100%.
-2. **Phase 2: Admin Live Log Viewer (`/admin/logs`)**
-   - Build SSE log streaming controller and dark terminal view.
-3. **Phase 3: Automated Archival to Telegram Storage Channel**
-   - Forward approved community submissions to `TELEGRAM_STORAGE_CHANNEL_ID` and save message IDs.
+2. **Phase 2: Admin Live Log Viewer (`/admin/logs`) & Multi-Channel Telemetry** ✅ **(COMPLETED)**
+   - Configured 5 dedicated channels: `telegram`, `drive`, `rbac`, `auth`, `api` with daily rotation.
+   - Built `LogAdminController` with real-time Server-Sent Events (SSE) streaming (`/admin/logs/stream`).
+   - Terminal UI with live level filter (ERROR, WARNING, INFO, DEBUG), search filter, auto-scroll toggle, download & purge.
+   - 100% automated test coverage in `tests/Feature/LogAdminTest.php`.
+3. **Phase 3: Automated Archival to Telegram Storage Channel** ✅ **(COMPLETED)**
+   - Forward approved community submissions to `TELEGRAM_STORAGE_CHANNEL_ID` and save `telegram_message_id`.
+   - Handled automatically in `ResourceModerationService::sendToStorageChannel` and `ResourceUploadService::sync`.
 4. **Phase 4: Google Drive Batch Sync**
    - Add batch upload retry endpoint and UI button in Admin Panel.
 5. **Phase 5: Informational Sections (EDISU, Deadlines, Support)**
