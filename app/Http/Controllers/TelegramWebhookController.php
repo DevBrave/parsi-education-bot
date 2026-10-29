@@ -24,7 +24,7 @@ class TelegramWebhookController extends Controller
     public function handle(Request $request): Response
     {
         $payload = $request->all();
-        Log::info('Telegram webhook received', ['payload' => $payload]);
+        bot_log('telegram')->info('Telegram webhook received', ['payload' => $payload]);
 
         if (app()->isLocal()) {
             Cache::put(
@@ -34,7 +34,14 @@ class TelegramWebhookController extends Controller
             );
         }
 
-        // Dispatch the background job so Telegram gets an instant 204 response
+        // Inline queries are time-critical (< 1-2s Telegram UI timeout).
+        // Execute synchronously so Telegram receives answerInlineQuery immediately without queue delay.
+        if (isset($payload['inline_query'])) {
+            app(\App\Telegram\TelegramUpdateDispatcher::class)->dispatch($payload);
+            return response()->noContent();
+        }
+
+        // Dispatch other background jobs so Telegram gets an instant 204 response
         ProcessTelegramUpdate::dispatch($payload);
 
         return response()->noContent();

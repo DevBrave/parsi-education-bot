@@ -129,6 +129,15 @@ class TelegramGroupSearchTest extends TestCase
 
     public function test_chosen_inline_result_increments_downloads_and_inline_shares_count(): void
     {
+        $channelMock = \Mockery::mock(\Psr\Log\LoggerInterface::class);
+        $channelMock->shouldReceive('info')
+            ->once()
+            ->with(\Mockery::pattern('/Resource #\d+ selected via inline query/'), \Mockery::type('array'));
+
+        \Illuminate\Support\Facades\Log::shouldReceive('channel')
+            ->with('telegram')
+            ->andReturn($channelMock);
+
         $user = User::create(['telegram_user_id' => 55667788, 'first_name' => 'Uploader2']);
         $course = Course::create(['name' => 'Physics I', 'course_code' => '01PHY', 'is_active' => true]);
         $type = ResourceType::firstOrCreate(['code' => 'notes'], ['display_name' => 'Notes', 'is_active' => true]);

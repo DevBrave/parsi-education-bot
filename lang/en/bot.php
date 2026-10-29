@@ -8,6 +8,11 @@ return [
             .'لطفاً زبان مورد نظر خود را انتخاب کنید:',
         'program_prompt' => "🎓 <b>Select your Degree Programme</b>\n\n"
             .'Please choose your study track at Politecnico di Torino to customize your course catalog:',
+        'degree_prompt' => "🎓 <b>Select Degree Level</b>\n\n"
+            ."Please select your degree level :",
+        'programs_by_degree_prompt' => "📚 <b>Select Programme (:degree)</b>\n\n"
+            ."Please choose your study programme:",
+        'back_degrees' => '⬅️ Back to Degree Levels',
         'completed' => "🎉 <b>Setup complete, :name!</b>\n\n"
             .'Your programme is set to <b>:program</b>.',
         'ready' => 'What would you like to do?',
@@ -40,10 +45,42 @@ return [
         'settings' => '⚙️ Settings',
         'edisu' => '🔍 Edisu',
         'deadlines' => '❓ Important Deadlines',
-        'contact' => '⚠️ Contact / Report',
-        'edisu_coming_soon' => "🔍 <b>Edisu</b>\n\nThis section is coming soon!",
-        'deadlines_coming_soon' => "❓ <b>Important Deadlines</b>\n\nThis section is coming soon!",
-        'contact_coming_soon' => "⚠️ <b>Contact / Report</b>\n\nThis section is coming soon!",
+        'contact' => '📞 Contact Us',
+        'report' => '⚠️ Report',
+        'tutorials' => '📑 Tutorials & Guides',
+        'groups' => '👥 Student Groups',
+        'edisu_coming_soon' => "🔍 <b>Edisu</b>\n\nThe Edisu guide section will be available soon! 🚀",
+        'deadlines_coming_soon' => "❓ <b>Important Deadlines</b>\n\nAcademic deadlines will be available soon! 🚀",
+        'tutorials_coming_soon' => "📑 <b>Tutorials & Guides</b>\n\nPARSI tutorials and educational guides will be available soon! 🚀",
+        'groups_coming_soon' => "👥 <b>Student Groups</b>\n\nMajor and course-specific student groups will be available here soon! 🚀",
+        'contact_coming_soon' => "⚠️ <b>Contact / Report</b>\n\nThis section will be available soon! 🚀",
+    ],
+    'report' => [
+        'title' => "⚠️ <b>Report & Support Center</b>\n\n"
+            . "Please let us know if you encountered an issue with any course file or if you would like to report something to the PARSI team:\n\n"
+            . "• To report an incorrect or damaged course material, search for it and tap <b>Report</b>.\n"
+            . "• To send a report or feedback to administrators, tap <b>Send Report Message</b>.",
+        'report_material_btn' => '🔍 Search Material to Report',
+        'send_report_btn' => '📝 Send Report to Admins',
+    ],
+    'tutorials' => [
+        'title' => "📑 <b>PARSI Educational Guides & Tutorials</b>\n\n"
+            . "Explore step-by-step guides and tutorials prepared by the PARSI student association for Politecnico di Torino students.\n\n"
+            . "Select a guide below to open the corresponding file/post:",
+        'edisu_btn' => '🏛️ EDISU Scholarship & Housing Guide',
+        'enrollment_btn' => '🎓 Enrollment & Visa Guide',
+        'didattica_btn' => '💻 Portale della Didattica Tutorial',
+        'permesso_btn' => '🪪 Permesso di Soggiorno Guide',
+        'channel_guides_btn' => '📢 Browse All Guides in PARSI Channel',
+    ],
+    'education_hub' => [
+        'title' => "📚 <b>Study Resources</b>\n\n"
+            ."Welcome to the PARSI academic repository for Politecnico di Torino.\n\n"
+            ."Here you can explore verified course materials, search across all subjects, or contribute past exams and notes for fellow students!\n\n"
+            ."What would you like to do?",
+        'browse_btn' => '📚 View Courses & Materials',
+        'search_btn' => '🔍 Search Materials',
+        'submit_btn' => '📤 Submit Material',
     ],
     'submit_material' => [
         'prompt' => "📤 <b>Contribute Study Material</b>\n\n"
@@ -70,7 +107,7 @@ return [
         'cancel' => '❌ Cancel',
         'back_to_edu' => '⬅️ Back to Study Resources',
         'approved_notification' => "🎉 <b>Good news!</b>\n\nYour submitted material for <b>:course</b> has been approved by the Education Committee and is now published on the bot!\n\nThank you for supporting fellow PoliTo students! 🎓",
-        'rejected_notification' => "ℹ️ <b>Submission Update</b>\n\nYour submitted file for <b>:course</b> was reviewed by the Education Committee and could not be approved for publication at this time.\n\nThank you for your effort and support! 🤝",
+        'rejected_notification' => "❌ <b>Submission Update</b>\n\nYour submitted file for <b>:course</b> was reviewed by the Education Committee and could not be approved for publication at this time.\n\nThank you for your effort and support! 🤝",
         'writing_title' => "This is your title: <b>:title</b>\n\nIf you want to continue, tap <b>Yes</b> and send your file(s).",
         'choose_title' => "⚠️ <b>Please choose a title first!</b>\n\nBefore uploading your file(s), please type a descriptive title (e.g. <i>2024 Exams with solutions</i>) into this chat and confirm it.",
         'title_approved' => "✅ <b>Title confirmed!</b>\n\nYou can now send your file(s) directly into this chat (single file or album).",
@@ -78,9 +115,13 @@ return [
         'waiting_for_files' => "📎 <b>Waiting for files...</b>\n\nTitle: <b>:title</b>\n\nPlease send your file(s) (PDF, ZIP, DOCX, or photo) into this chat.",
     ],
     'courses' => [
-        'choose_course' => "🎓 <b>:program</b>\n\nChoose a course to view materials:",
+        'choose_course' => "\nChoose a course to view materials:",
         'choose_program' => "📚 <b>Study Resources</b>\n\nChoose your degree programme:",
         'choose_year' => "🎓 <b>:program</b>\n\nChoose your academic year to view courses:",
+        'choose_track' => "🎯 <b>:program</b>\n\nChoose your specialization track:",
+        'change_track' => '🎯 Change Track',
+        'all_tracks' => '🌐 All Tracks (Show All Courses)',
+        'saved_track' => "✅ <i>Track saved: :track</i>\n\n",
         'year_1' => '1️⃣ 1st Year',
         'year_2' => '2️⃣ 2nd Year',
         'year_3' => '3️⃣ 3rd Year',
@@ -102,7 +143,15 @@ return [
         'change_program' => '🔄 Change Programme',
         'back_courses' => '⬅️ Back to Courses',
         'back_types' => '⬅️ Back to Types',
+        'back_edu' => '⬅️ Back to Study Resources',
         'back_main' => '⬅️ Back to Main Menu',
+    ],
+    'tracks' => [
+        'choose_track' => "🎯 <b>:program</b>\n\nChoose your specialization track (inner major):",
+        'change_track' => '🎯 Change Track',
+        'all_tracks' => '🌐 All Tracks (Show All Courses)',
+        'saved_track' => "✅ <i>Track saved: :track</i>\n\n",
+        'back_to_programs' => '⬅️ Back to Programs',
     ],
     'resources' => [
         'not_available' => 'This resource is no longer available.',
@@ -120,6 +169,8 @@ return [
         'download_drive' => '📥 Download from Google Drive',
         'download_file_drive' => '📥 Download :filename',
         'available_on_drive' => "📥 <b>Google Drive Download</b>\n\nThis material is available directly via Google Drive. Tap the button below to view or download it directly in your browser:",
+        'get_all_in_bot' => '📥 Get All Files in Bot',
+        'open_course_in_bot' => '📖 View Course in Bot',
     ],
     'simple_buttons' => [
         'yes' => 'Yes',
@@ -150,10 +201,11 @@ return [
         'cancelled' => 'Report cancelled.',
     ],
     'contact' => [
-        'hub_text' => "⚠️ <b>Contact & Material Reports</b>\n\n"
-            ."Need assistance, have feedback, or found an issue with study materials? We are here to help:\n\n"
-            ."• <b>Report a Material:</b> If a document is corrupted, incorrect, or unreadable, tap <b>🔍 Search Material to Report</b> or use the <b>[⚠️ Report Material]</b> button directly under any downloaded file.\n\n"
-            ."• <b>Message Admins:</b> Send your question, suggestion, or feedback directly to the PARSI team.",
+        'hub_text' => "📞 <b>Contact Us & Student Support</b>\n\n"
+            ."Need assistance, have questions, or want to report an issue with study materials? We are here to help:\n\n"
+            ."• <b>Message Admins:</b> Send your question, suggestion, or feedback via direct message to the PARSI Telegram channel.\n"
+            ."• <b>Report a Material:</b> If a document is corrupted, incorrect, or unreadable, search for it to file a report.\n"
+            ."• <b>Community Channel:</b> Join our official Telegram channel for updates and announcements.",
         'report_material_btn' => '🔍 Search Material to Report',
         'send_message_btn' => '💬 Send Message to Admins',
         'channel_btn' => '📢 PARSI Telegram Channel',
@@ -161,4 +213,47 @@ return [
         'sent_success' => "✅ <b>Message Sent!</b>\n\nThank you for reaching out. The PARSI team has received your message and will review it.",
         'cancelled' => 'Contact cancelled.',
     ],
+    'about' => [
+        'text' => "<b>PARSI</b> is the Iranian Students Association at <b>Politecnico di Torino</b>, created to support, connect, and assist Iranian students throughout their university experience.\n\n"
+            . "🎯 <b>Our Mission</b>\n"
+            . "We aim to make academic and student life easier by collecting and providing <b>course materials, lecture notes, past exam questions, educational guides</b>, as well as updates on important <b>university, EDISU, and administrative deadlines</b>.\n\n"
+            . "🤝 <b>Built by Students, for Students</b>\n"
+            . "A large part of the resources available through this bot is contributed by students themselves and is reviewed and organized before being shared with the community.\n\n"
+            . "This bot is built through student collaboration, with the goal of making useful knowledge, resources, and experience accessible to everyone.\n\n"
+            . "<b>Welcome to the Iranian student community at Politecnico di Torino.</b>",
+        'channel_btn' => '📢 Official Telegram Channel',
+        'insta_btn' => '📸 Official Instagram Page',
+        'contact_btn' => '💬 Contact PARSI Team',
+        'members_btn' => '👥 PARSI Team Members',
+        'back_about' => '⬅️ Back to About Us',
+        'members_text' => "👥 <b>PARSI Board & Committee Members</b>\n\n"
+            . "• <b>Kave Alikhani</b> — President\n"
+            . "• <b>Arya Gholami</b> — Vice President\n"
+            . "• <b>Anita Javidian</b> — Head of Media Committee\n"
+            . "• <b>Arya Mansouri</b> — Financial Manager\n"
+            . "• <b>Nika Taherian</b> — Head of Cultural Committee\n"
+            . "• <b>Ali Arsalan</b> — Head of Executive Committee\n"
+            . "• <b>Hamidreza Ramezani</b> — Head of Education Committee\n"
+    ],
+    'rate_limit' => [
+        'too_many_messages' => "⚠️ <b>Too Many Requests</b>\n\nYou are sending messages too quickly. Please wait <b>:seconds seconds</b> before trying again.",
+        'too_many_uploads' => "⚠️ <b>Hourly Upload Limit Reached</b>\n\nTo prevent abuse, student accounts can upload up to 20 files per hour. Please wait <b>:minutes minutes</b> before uploading more materials.",
+        'too_many_clicks' => '⚠️ Please slow down! You are clicking buttons too rapidly.',
+    ],
+    'file_security' => [
+        'rejected' => "🛡️ <b>Security Alert: File Rejected</b>\n\nThe file <code>:filename</code> could not be accepted for the following reason:\n<b>:reason</b>\n\n📌 <i>Please only upload genuine educational materials such as PDF, Word, PowerPoint, or ZIP files.</i>",
+        'reasons' => [
+            'dangerous_extension' => 'Executable or script files are strictly prohibited for system and student safety.',
+            'unsupported_extension' => 'This file format is not supported. Please upload a PDF, Word, PowerPoint, or ZIP file.',
+            'double_extension' => 'Files with disguised or double extensions are blocked for security.',
+            'missing_extension' => 'File is missing a valid extension.',
+            'magic_bytes_mismatch' => 'File binary signature does not match its extension (possible extension spoofing).',
+            'malicious_signature_detected' => 'Malicious executable signature detected inside file header.',
+            'embedded_script_detected' => 'Embedded script or code payload detected in file.',
+            'virus_detected' => 'Antivirus scan flagged this file as unsafe.',
+            'empty_file' => 'The uploaded file is empty (0 bytes).',
+            'default' => 'File failed security verification.',
+        ],
+    ],
 ];
+

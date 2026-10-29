@@ -8,6 +8,7 @@ use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\ResourceType;
 use App\Models\User;
+use App\Services\FileSecurityService;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Log;
 class FileUploadHandler
 {
     public function __construct(
-        protected TelegramService $telegram
+        protected TelegramService $telegram,
+        protected FileSecurityService $fileSecurity
     ) {}
 
     /**
@@ -55,7 +57,7 @@ class FileUploadHandler
             return;
         }
 
-        if(! isset($state['title'])){
+        if (! isset($state['title'])) {
 
             $this->telegram->sendMessage(
                 $chatId,
@@ -69,6 +71,41 @@ class FileUploadHandler
         // 1. Extract file info
         $fileData = $this->extractFileInfo($message);
         if (! $fileData) {
+            return;
+        }
+
+        // 1b. File Security & Anti-Virus Validation
+        $security = $this->fileSecurity->validateUpload(
+            $fileData['original_filename'],
+            $fileData['mime_type']
+        );
+
+        if (! $security['valid']) {
+            $reasonKey = 'bot.file_security.reasons.' . ($security['reason'] ?? 'default');
+            $reasonText = __($reasonKey, [], $lang);
+            $warningMsg = __('bot.file_security.rejected', [
+                'filename' => e($fileData['original_filename']),
+                'reason' => $reasonText,
+            ], $lang);
+
+            $this->telegram->sendMessage($chatId, $warningMsg, null, 'HTML');
+
+            bot_log('rbac')->warning("Blocked dangerous file upload from User #{$user->id}: {$fileData['original_filename']} (Reason: {$security['reason']})");
+            return;
+        }
+
+        $fileData['original_filename'] = $security['sanitized_filename'];
+
+        // 1c. Duplicate File Check (Before creating Resource record)
+        $isDuplicate = ResourceFile::where('telegram_file_unique_id', $fileData['telegram_file_unique_id'])->exists();
+        if ($isDuplicate) {
+            $this->telegram->sendMessage(
+                $chatId,
+                "⚠️ The file <b>" . e($fileData['original_filename']) . "</b> has already been uploaded previously.",
+                null,
+                'HTML'
+            );
+
             return;
         }
 
@@ -146,6 +183,12 @@ class FileUploadHandler
             'telegram_file_unique_id' => $fileData['telegram_file_unique_id'],
         ]);
 
+        log_rbac("File '{$fileData['original_filename']}' uploaded to Resource #{$resource->id} ('{$resource->title}') via Telegram", $user, [
+            'resource_id' => $resource->id,
+            'filename' => $fileData['original_filename'],
+            'course_id' => $course->id,
+        ]);
+
         $totalFiles = $resource->files()->count();
         $filename = e($fileData['original_filename']);
 
@@ -210,7 +253,15 @@ class FileUploadHandler
 
         $course = $resource->course;
         $resourceType = $resource->resourceType;
-        $files = $resource->files;
+
+        // Force fresh load from DB to include all files uploaded during this session
+        $files = ResourceFile::where('resource_id', $resource->id)->get();
+        $fileCount = $files->count();
+
+        if ($fileCount === 0) {
+            Cache::forget($notifiedKey);
+            return;
+        }
 
         $fileLines = [];
         foreach ($files as $file) {
@@ -245,7 +296,7 @@ class FileUploadHandler
         $message = "📥 <b>New Material Uploaded (Pending Review)</b>\n\n"
             . "📚 <b>Course:</b> " . e($course?->name ?? 'Unknown') . "\n"
             . "📝 <b>Title:</b> " . e($resource->title) . "\n"
-            . "📁 <b>Attached Files (" . $files->count() . "):</b>\n" . $fileList . "\n\n"
+            . "📁 <b>Attached Files (" . $fileCount . "):</b>\n" . $fileList . "\n\n"
             . "👤 <b>Submitted by:</b> " . e($submitterInfo) . "\n"
             . "🏷 <b>Category:</b> " . e($resourceType?->display_name ?? 'General') . "\n"
             . "⏳ <b>Status:</b> <code>pending review</code>\n"
@@ -256,22 +307,79 @@ class FileUploadHandler
             $message .= "\n\n🔗 <b>Review Link:</b> <code>{$reviewUrl}</code>";
         }
 
-        $primaryFile = $files->first();
         try {
-            if ($primaryFile && ! empty($primaryFile->telegram_file_id)) {
-                $isPhoto = str_starts_with($primaryFile->mime_type ?? '', 'image/');
-                $response = $isPhoto
-                    ? $this->telegram->sendPhoto($adminChatId, $primaryFile->telegram_file_id, $message, 'HTML', $replyMarkup)
-                    : $this->telegram->sendDocument($adminChatId, $primaryFile->telegram_file_id, $message, 'HTML', $replyMarkup);
+            if ($fileCount === 1) {
+                $file = $files->first();
+                if ($file && ! empty($file->telegram_file_id)) {
+                    $isPhoto = str_starts_with($file->mime_type ?? '', 'image/');
+                    $response = $isPhoto
+                        ? $this->telegram->sendPhoto($adminChatId, $file->telegram_file_id, $message, 'HTML', $replyMarkup)
+                        : $this->telegram->sendDocument($adminChatId, $file->telegram_file_id, $message, 'HTML', $replyMarkup);
 
-                if (! $response->json('ok')) {
+                    if (! $response || ! $response->json('ok')) {
+                        $this->telegram->sendMessage($adminChatId, $message, $replyMarkup, 'HTML');
+                    }
+                } else {
                     $this->telegram->sendMessage($adminChatId, $message, $replyMarkup, 'HTML');
                 }
             } else {
+                // Multi-file group: send as native Telegram media group (album)
+                $photos = $files->filter(fn($f) => str_starts_with($f->mime_type ?? '', 'image/') && ! empty($f->telegram_file_id))->values();
+                $documents = $files->filter(fn($f) => ! str_starts_with($f->mime_type ?? '', 'image/') && ! empty($f->telegram_file_id))->values();
+
+                // 1. Send photo media groups if photos exist
+                if ($photos->count() >= 2) {
+                    $photoMedia = [];
+                    foreach ($photos as $i => $pf) {
+                        $photoMedia[] = [
+                            'type' => 'photo',
+                            'media' => $pf->telegram_file_id,
+                            'caption' => "📸 <b>Photo " . ($i + 1) . "/{$photos->count()}:</b> " . e($pf->original_filename),
+                            'parse_mode' => 'HTML',
+                        ];
+                    }
+                    foreach (array_chunk($photoMedia, 10) as $chunk) {
+                        $res = $this->telegram->sendMediaGroup($adminChatId, $chunk);
+                        if (! $res || ! $res->json('ok')) {
+                            foreach ($chunk as $item) {
+                                $this->telegram->sendPhoto($adminChatId, $item['media'], $item['caption'], 'HTML');
+                            }
+                        }
+                    }
+                } elseif ($photos->count() === 1) {
+                    $pf = $photos->first();
+                    $this->telegram->sendPhoto($adminChatId, $pf->telegram_file_id, "📸 " . e($pf->original_filename), 'HTML');
+                }
+
+                // 2. Send document media groups if documents exist
+                if ($documents->count() >= 2) {
+                    $docMedia = [];
+                    foreach ($documents as $i => $df) {
+                        $docMedia[] = [
+                            'type' => 'document',
+                            'media' => $df->telegram_file_id,
+                            'caption' => "📄 <b>File " . ($i + 1) . "/{$documents->count()}:</b> " . e($df->original_filename) . " (" . $df->formatted_size . ")",
+                            'parse_mode' => 'HTML',
+                        ];
+                    }
+                    foreach (array_chunk($docMedia, 10) as $chunk) {
+                        $res = $this->telegram->sendMediaGroup($adminChatId, $chunk);
+                        if (! $res || ! $res->json('ok')) {
+                            foreach ($chunk as $item) {
+                                $this->telegram->sendDocument($adminChatId, $item['media'], $item['caption'], 'HTML');
+                            }
+                        }
+                    }
+                } elseif ($documents->count() === 1) {
+                    $df = $documents->first();
+                    $this->telegram->sendDocument($adminChatId, $df->telegram_file_id, "📄 " . e($df->original_filename) . " (" . $df->formatted_size . ")", 'HTML');
+                }
+
+                // 3. Send the summary review card with moderation Approve & Reject buttons
                 $this->telegram->sendMessage($adminChatId, $message, $replyMarkup, 'HTML');
             }
         } catch (\Throwable $e) {
-            Log::warning('Failed to send admin notification for uploaded resource', [
+            bot_log('telegram')->warning('Failed to send admin notification for uploaded resource', [
                 'error' => $e->getMessage(),
                 'resource_id' => $resource->id,
             ]);
@@ -337,7 +445,4 @@ class FileUploadHandler
 
         return null;
     }
-
-
 }
-

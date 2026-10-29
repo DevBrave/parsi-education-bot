@@ -9,6 +9,7 @@ use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use App\Telegram\Keyboards\ProgramMenuKeyboard;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class MessageHandler
 {
@@ -36,6 +37,15 @@ class MessageHandler
             if (str_starts_with($param, 'course_')) {
                 $courseId = (int) substr($param, 7);
                 app(CallbackQueryHandler::class)->handleSelectCourseDirect($chatId, $courseId, $user);
+
+                return;
+            }
+            if (str_starts_with($param, 'report_')) {
+                $payload = substr($param, 7);
+                $parts = explode('_', $payload);
+                $resourceId = (int) ($parts[0] ?? 0);
+                $fileId = isset($parts[1]) ? (int) $parts[1] : 0;
+                app(CallbackQueryHandler::class)->handleReportPromptDirect($chatId, $resourceId, $fileId, $user);
 
                 return;
             }
@@ -70,8 +80,18 @@ class MessageHandler
             $this->sendSearchPrompt($chatId, $user);
         } elseif (str_starts_with($text, '/search ')) {
             $this->executeSearch($chatId, $user, trim(substr($text, 8)));
-        } elseif (in_array($text, ['⚠️ Contact / Report', '⚠️ ارتباط / گزارش', '⚠️ Contatti / Segnalazioni', '/contact', '/report'], true)) {
+        } elseif (in_array($text, ['📑 Tutorials & Guides', '📑 راهنماهای آموزشی', '📑 Guide e Tutorial', '/tutorials', '/guides'], true)) {
+            $this->sendTutorialsMenu($chatId, $user);
+        } elseif (in_array($text, ['👥 Student Groups', '👥 گروه‌های دانشجویی', '👥 Gruppi Studenti', '/groups'], true)) {
+            $this->sendStudentGroupsMenu($chatId, $user);
+        } elseif (in_array($text, ['⚠️ Report', '⚠️ گزارش', '⚠️ Segnalazioni', '/report'], true)) {
+            $this->sendReportMenu($chatId, $user);
+        } elseif (in_array($text, ['📞 Contact Us', '📞 Contattaci', '📞 تماس با ما', '/contact'], true)) {
+            $this->sendContactMenu($chatId, $user);
+        } elseif (in_array($text, ['⚠️ Contact / Report', '⚠️ ارتباط / گزارش', '⚠️ Contatti / Segnalazioni'], true)) {
             $this->sendContactReportMenu($chatId, $user);
+        } elseif (in_array($text, ['ℹ️ About Us', 'ℹ️ Chi siamo', 'ℹ️ درباره ما', "\u{200F}ℹ️ درباره ما", 'درباره ما ℹ️', '/about'], true)) {
+            $this->sendAboutUsMenu($chatId, $user);
         } else {
             $contactCacheKey = "user_contact_state:{$user->id}";
             $contactState = Cache::get($contactCacheKey);
@@ -176,7 +196,7 @@ class MessageHandler
     /**
      * Send submit study material prompt.
      */
-    protected function sendSubmitPrompt(int $chatId, User $user): void
+    public function sendSubmitPrompt(int $chatId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
 
@@ -198,41 +218,25 @@ class MessageHandler
             }
         }
 
-        $prompt = __('bot.submit_material.prompt', [], $lang);
-
         $this->telegram->sendMessage(
             $chatId,
-            $prompt,
-            ProgramMenuKeyboard::backToMain($lang)
+            __('bot.courses.choose_program', [], $lang),
+            ProgramMenuKeyboard::programmes($lang, backCallback: 'back_edu_hub', forSubmission: true)
         );
     }
 
     /**
-     * Send educational files: direct courses if user has a saved programme, or selector.
+     * Send educational resources hub menu.
      */
     public function sendEducationalFiles(int $chatId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
 
-        if ($user->program_id) {
-            $program = $user->program;
-            if ($program && $program->is_active) {
-                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_year', [
-                    'program' => e($program->name) . $levelTag,
-                ], $lang);
-
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $text,
-                    ProgramMenuKeyboard::years($program, $lang)
-                );
-
-                return;
-            }
-        }
-
-        $this->sendProgrammeSelector($chatId, null, $lang);
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.education_hub.title', [], $lang),
+            ProgramMenuKeyboard::educationHub($lang)
+        );
     }
 
     /**
@@ -304,6 +308,7 @@ class MessageHandler
                     });
             })
             ->with(['course', 'resourceType', 'files'])
+            ->latest()
             ->take(8)
             ->get();
 
@@ -311,7 +316,7 @@ class MessageHandler
             $replyMarkup = $showNavigation ? [
                 'inline_keyboard' => [
                     [['text' => __('bot.search.search_again', [], $lang), 'callback_data' => 'search_prompt']],
-                    [['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main']],
+                    [['text' => __('bot.courses.back_edu', [], $lang), 'callback_data' => 'back_edu_hub']],
                 ],
             ] : null;
 
@@ -334,9 +339,48 @@ class MessageHandler
     }
 
     /**
-     * Send Contact & Report Hub menu.
+     * Send PARSI Educational Guides & Tutorials menu (coming soon).
      */
-    public function sendContactReportMenu(int $chatId, User $user): void
+    public function sendTutorialsMenu(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.sections.tutorials_coming_soon', [], $lang),
+            ProgramMenuKeyboard::backToMain($lang, 'tutorials')
+        );
+    }
+
+    /**
+     * Send Student Groups menu (coming soon).
+     */
+    public function sendStudentGroupsMenu(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.sections.groups_coming_soon', [], $lang),
+            ProgramMenuKeyboard::backToMain($lang, 'groups')
+        );
+    }
+
+    /**
+     * Send Report Menu.
+     */
+    public function sendReportMenu(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.report.title', [], $lang),
+            ProgramMenuKeyboard::reportMenu($lang)
+        );
+    }
+
+    /**
+     * Send Contact Menu.
+     */
+    public function sendContactMenu(int $chatId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
         $this->telegram->sendMessage(
@@ -344,6 +388,14 @@ class MessageHandler
             __('bot.contact.hub_text', [], $lang),
             ProgramMenuKeyboard::contactMenu($lang)
         );
+    }
+
+    /**
+     * Send Contact & Report Hub menu (compatibility fallback).
+     */
+    public function sendContactReportMenu(int $chatId, User $user): void
+    {
+        $this->sendContactMenu($chatId, $user);
     }
 
     /**
@@ -379,4 +431,18 @@ class MessageHandler
             MainMenuKeyboard::build($lang)
         );
     }
+
+    /**
+     * Send About Us information card.
+     */
+    public function sendAboutUsMenu(int $chatId, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.about.text', [], $lang),
+            ProgramMenuKeyboard::aboutUsMenu($lang)
+        );
+    }
 }
+

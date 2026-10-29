@@ -18,6 +18,8 @@ return [
 
     'channel_username' => env('TELEGRAM_CHANNEL_USERNAME', 'PARSI_POLITO'),
 
+    'instagram_link' => env('INSTAGRAM_PAGE_LINK','https://www.instagram.com/parsi___polito/'),
+
     'bot_username' => env('TELEGRAM_BOT_USERNAME', 'parsi_politobot'),
 
     'storage_channel_id' => env('TELEGRAM_STORAGE_CHANNEL_ID', ''),

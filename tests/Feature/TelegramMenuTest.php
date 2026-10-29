@@ -76,7 +76,7 @@ class TelegramMenuTest extends TestCase
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
             && $request['reply_markup']['keyboard'][0][0]['text'] === '📚 منابع درسی'
-            && str_contains($request['text'], 'به ربات تلگرام انجمن پارسی خوش آمدید'));
+            && str_contains($request['text'], 'انجمن پارسی خوش آمدید'));
     }
 
     public function test_italian_user_receives_italian_menu(): void
@@ -144,10 +144,18 @@ class TelegramMenuTest extends TestCase
                 return false;
             }
             $keyboard = $request['reply_markup']['inline_keyboard'] ?? [];
-            $flattened = array_column(array_merge(...$keyboard), 'callback_data');
+            $flattened = [];
+            foreach ($keyboard as $row) {
+                foreach ($row as $btn) {
+                    if (isset($btn['callback_data'])) {
+                        $flattened[] = $btn['callback_data'];
+                    }
+                }
+            }
 
-            return in_array("course_{$course->id}_0_all", $flattened, true)
-                && in_array("send_resource_{$resource->id}", $flattened, true);
+            $hasCourse = collect($flattened)->contains(fn ($cb) => str_starts_with($cb, "course_{$course->id}_"));
+
+            return $hasCourse && in_array("send_resource_{$resource->id}", $flattened, true);
         });
     }
 
@@ -174,8 +182,116 @@ class TelegramMenuTest extends TestCase
             $keyboard = $request['reply_markup']['inline_keyboard'] ?? [];
             $flattened = array_column(array_merge(...$keyboard), 'callback_data');
 
-            return in_array("course_{$course->id}_0_all", $flattened, true);
+            return collect($flattened)->contains(fn ($cb) => str_starts_with($cb, "course_{$course->id}_"));
         });
+    }
+
+    public function test_program_menu_keyboard_years_and_caching(): void
+    {
+        $program = \App\Models\Program::firstOrCreate(
+            ['name' => 'Cache Test Program'],
+            ['degree_level' => 'bachelor', 'university' => 'PoliTo', 'is_active' => true]
+        );
+
+        $course1 = \App\Models\Course::firstOrCreate(
+            ['course_code' => 'TEST_YR1'],
+            ['name' => 'Course Year 1', 'credits' => 6.0, 'year' => 1, 'is_active' => true]
+        );
+        $course2 = \App\Models\Course::firstOrCreate(
+            ['course_code' => 'TEST_YR2'],
+            ['name' => 'Course Year 2', 'credits' => 6.0, 'year' => 2, 'is_active' => true]
+        );
+
+        $program->courses()->syncWithoutDetaching([$course1->id, $course2->id]);
+
+        \Illuminate\Support\Facades\Cache::forget("catalog:years:program_{$program->id}");
+
+        $keyboard = \App\Telegram\Keyboards\ProgramMenuKeyboard::years($program, 'fa');
+        $this->assertIsArray($keyboard);
+        $this->assertArrayHasKey('inline_keyboard', $keyboard);
+
+        // Verify cached value is a primitive array, not an incomplete object
+        $cached = \Illuminate\Support\Facades\Cache::get("catalog:years:program_{$program->id}");
+        $this->assertIsArray($cached);
+        $this->assertContains(1, $cached);
+        $this->assertContains(2, $cached);
+
+        // Call again to verify cache hit execution
+        $cachedKeyboard = \App\Telegram\Keyboards\ProgramMenuKeyboard::years($program, 'fa');
+        $this->assertEquals($keyboard, $cachedKeyboard);
+
+        // Test empty Master degree defaults to [1, 2]
+        $masterProgram = new \App\Models\Program(['degree_level' => 'master']);
+        $this->assertEquals([1, 2], $masterProgram->defaultYears());
+
+        // Test empty Bachelor degree defaults to [1, 2, 3]
+        $bachelorProgram = new \App\Models\Program(['degree_level' => 'bachelor']);
+        $this->assertEquals([1, 2, 3], $bachelorProgram->defaultYears());
+    }
+
+    public function test_about_us_and_members_menu(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $user = new User(['first_name' => 'Sara', 'preferred_language' => 'en']);
+
+        // 1. User taps About Us
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 777], 'text' => 'ℹ️ About Us'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && str_contains($request['text'], 'PARSI')
+            && isset($request['reply_markup']['inline_keyboard'][0][0]['callback_data'])
+            && $request['reply_markup']['inline_keyboard'][0][0]['callback_data'] === 'about_members');
+
+        // 2. User taps "Members" button
+        $this->invokeHandler('handleCallbackQuery', [
+            ['id' => 'cb-about-mem', 'data' => 'about_members', 'message' => ['chat' => ['id' => 777], 'message_id' => 10]],
+            $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/editMessageText')
+            && str_contains($request['text'], 'Kave Alikhani')
+            && str_contains($request['text'], 'Hamidreza Ramezani'));
+    }
+
+    public function test_tutorials_and_report_menu_actions(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $user = new User(['first_name' => 'Ali', 'preferred_language' => 'fa']);
+
+        // 1. User taps Tutorials in Persian
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 888], 'text' => '📑 راهنماهای آموزشی'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && str_contains($request['text'], 'راهنماهای آموزشی')
+            && isset($request['reply_markup']['inline_keyboard']));
+
+        // 2. User taps Report in Persian
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 888], 'text' => '⚠️ گزارش'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && str_contains($request['text'], 'مرکز گزارش و پشتیبانی')
+            && isset($request['reply_markup']['inline_keyboard']));
+    }
+
+    public function test_student_groups_menu_action(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $user = new User(['first_name' => 'Ali', 'preferred_language' => 'fa']);
+
+        // User taps Student Groups in Persian
+        $this->invokeHandler('handleMessage', [
+            ['chat' => ['id' => 888], 'text' => '👥 گروه‌های دانشجویی'], $user,
+        ]);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/sendMessage')
+            && str_contains($request['text'], 'گروه‌های دانشجویی')
+            && isset($request['reply_markup']['inline_keyboard']));
     }
 
     private function invokeHandler(string $method, array $arguments): void

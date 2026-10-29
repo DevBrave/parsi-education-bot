@@ -7,6 +7,7 @@ use App\Models\Program;
 use App\Models\Resource;
 use App\Models\ResourceReport;
 use App\Models\ResourceType;
+use App\Models\Track;
 use App\Models\User;
 use App\Services\ResourceModerationService;
 use App\Services\TelegramService;
@@ -83,12 +84,19 @@ class CallbackQueryHandler
                 __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
                 MainMenuKeyboard::build($lang)
             );
+        } elseif ($data === 'back_edu_hub') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.education_hub.title', [], $lang),
+                ProgramMenuKeyboard::educationHub($lang)
+            );
         } elseif ($data === 'change_program') {
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
-                __('bot.settings.change_program_prompt', [], $lang),
-                ProgramMenuKeyboard::programmes($lang)
+                __('bot.onboarding.degree_prompt', [], $lang),
+                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_main_settings')
             );
         } elseif ($data === 'change_language') {
             $this->telegram->editMessageText(
@@ -104,6 +112,14 @@ class CallbackQueryHandler
                 $messageId,
                 __('bot.search.prompt', [], $lang),
                 ProgramMenuKeyboard::searchPrompt($lang)
+            );
+        } elseif ($data === 'cancel_search') {
+            Cache::forget("user_search_state:{$user->id}");
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.education_hub.title', [], $lang),
+                ProgramMenuKeyboard::educationHub($lang)
             );
         } elseif ($data === 'contact_prompt') {
             Cache::put("user_contact_state:{$user->id}", ['step' => 'awaiting_contact_message'], now()->addMinutes(15));
@@ -132,17 +148,100 @@ class CallbackQueryHandler
                 __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
                 MainMenuKeyboard::build($lang)
             );
-        } elseif ($data === 'edu_files') {
+        } elseif ($data === 'about_members') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.about.members_text', [], $lang),
+                ProgramMenuKeyboard::aboutMembersMenu($lang)
+            );
+        } elseif ($data === 'back_about') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.about.text', [], $lang),
+                ProgramMenuKeyboard::aboutUsMenu($lang)
+            );
+        } elseif ($data === 'edu_browse' || $data === 'edu_files') {
             if ($user->program_id && $user->program && $user->program->is_active) {
-                $this->handleSelectProgram($chatId, $messageId, $user->program_id, $user);
+                $levelTag = $user->program->degree_level ? " ({$user->program->degree_level})" : '';
+                $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
+                $text = __('bot.courses.choose_year', [
+                    'program' => e($user->program->name) . $levelTag . $trackTag,
+                ], $lang);
+
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $text,
+                    ProgramMenuKeyboard::years($user->program, $lang)
+                );
+            } else {
+                $this->telegram->editMessageText(   
+                    $chatId,
+                    $messageId,
+                    __('bot.onboarding.degree_prompt', [], $lang),
+                    ProgramMenuKeyboard::degrees($lang, backCallback: 'back_edu_hub')
+                );
+            }
+        } elseif ($data === 'edu_submit_start') {
+            if ($user->program_id && $user->program && $user->program->is_active) {
+                $levelTag = $user->program->degree_level ? " ({$user->program->degree_level})" : '';
+                $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
+                $text = __('bot.courses.choose_year', [
+                    'program' => e($user->program->name) . $levelTag . $trackTag,
+                ], $lang);
+
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $text,
+                    ProgramMenuKeyboard::years($user->program, $lang, forSubmission: true)
+                );
             } else {
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
-                    __('bot.courses.choose_program', [], $lang),
-                    ProgramMenuKeyboard::programmes($lang)
+                    __('bot.onboarding.degree_prompt', [], $lang),
+                    ProgramMenuKeyboard::degrees($lang, backCallback: 'back_edu_hub')
                 );
             }
+        } elseif (str_starts_with($data, 'select_degree_')) {
+            $degreeLevel = substr($data, strlen('select_degree_'));
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.onboarding.programs_by_degree_prompt', ['degree' => $degreeLevel], $lang),
+                ProgramMenuKeyboard::programsByDegree($degreeLevel, $lang, backCallback: 'back_to_degrees')
+            );
+        } elseif ($data === 'back_to_degrees') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.onboarding.degree_prompt', [], $lang),
+                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_main_settings')
+            );
+        } elseif (str_starts_with($data, 'select_program_')) {
+            $programId = (int) substr($data, strlen('select_program_'));
+            $this->handleSelectProgram($chatId, $messageId, $programId, $user);
+        } elseif (str_starts_with($data, 'change_track_')) {
+            $programId = (int) substr($data, strlen('change_track_'));
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::tracks($program, $lang));
+            }
+        } elseif (str_starts_with($data, 'prog_years_')) {
+            $programId = (int) substr($data, strlen('prog_years_'));
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::years($program, $lang));
+            }
+        } elseif (str_starts_with($data, 'track_')) {
+            $this->handleSelectTrack($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'prog_')) {
             $this->handleSelectProgram($chatId, $messageId, (int) substr($data, 5), $user);
         } elseif (str_starts_with($data, 'course_year_')) {
@@ -153,21 +252,49 @@ class CallbackQueryHandler
             $this->handleSelectResourceType($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'send_resource_')) {
             $this->handleSendResource($chatId, $data, $user);
+        } elseif (str_starts_with($data, 'submit_change_track_')) {
+            $programId = (int) substr($data, strlen('submit_change_track_'));
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::tracks($program, $lang, forSubmission: true));
+            }
+        } elseif (str_starts_with($data, 'submit_prog_years_')) {
+            $programId = (int) substr($data, strlen('submit_prog_years_'));
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::years($program, $lang, forSubmission: true));
+            }
+        } elseif (str_starts_with($data, 'submit_track_')) {
+            $this->handleSelectSubmitTrack($chatId, $messageId, $data, $user);
         } elseif (str_starts_with($data, 'submit_prog_')) {
             $programId = (int) substr($data, strlen('submit_prog_'));
             $program = Program::where('is_active', true)->find($programId);
             if ($program) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_year', [
-                    'program' => e($program->name) . $levelTag,
-                ], $lang);
+                if ($program->tracks()->where('is_active', true)->exists()) {
+                    $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                    $this->telegram->editMessageText(
+                        $chatId,
+                        $messageId,
+                        $text,
+                        ProgramMenuKeyboard::tracks($program, $lang, forSubmission: true)
+                    );
+                } else {
+                    $text = __('bot.courses.choose_year', [
+                        'program' => e($program->name) . $levelTag,
+                    ], $lang);
 
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    $text,
-                    ProgramMenuKeyboard::years($program, $lang, forSubmission: true)
-                );
+                    $this->telegram->editMessageText(
+                        $chatId,
+                        $messageId,
+                        $text,
+                        ProgramMenuKeyboard::years($program, $lang, forSubmission: true)
+                    );
+                }
             }
         } elseif (str_starts_with($data, 'submit_year_')) {
             $this->handleSelectSubmitCourseYear($chatId, $messageId, $data, $user);
@@ -204,12 +331,13 @@ class CallbackQueryHandler
                 $chatId,
                 $messageId,
                 __('bot.submit_material.cancelled', [], $lang),
-                ['inline_keyboard' => []]
-            );
-            $this->telegram->sendMessage(
-                $chatId,
-                __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
-                MainMenuKeyboard::build($lang)
+                [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => __('bot.courses.back_edu', [], $lang), 'callback_data' => 'back_edu_hub'],
+                        ],
+                    ],
+                ]
             );
         } elseif ($data === 'finish_upload') {
             $this->handleFinishUpload($chatId, $messageId, $user);
@@ -294,7 +422,7 @@ class CallbackQueryHandler
             $chatId,
             $messageId,
             $text,
-            ProgramMenuKeyboard::submitCourses($program, $lang, $year, $page, 8)
+            ProgramMenuKeyboard::submitCourses($program, $lang, $year, $page, 8, $user->track_id)
         );
     }
 
@@ -350,19 +478,39 @@ class CallbackQueryHandler
     protected function handleSelectProgram(int $chatId, int $messageId, int $programId, User $user): void
     {
         $lang = $user->preferred_language ?? 'en';
-        $program = Program::with('courses')->where('is_active', true)->find($programId);
+        $program = Program::with('tracks')->where('is_active', true)->find($programId);
 
         if ($program) {
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
             $programTitle = e($program->name) . $levelTag;
 
             $text = '';
-            if ($user->program_id !== $program->id) {
-                $user->update(['program_id' => $program->id]);
+            $changedProgram = ($user->program_id !== $program->id);
+            if ($changedProgram) {
+                $user->update(['program_id' => $program->id, 'track_id' => null]);
                 $text .= __('bot.courses.saved_as_default', [], $lang);
             }
 
-            $text .= __('bot.courses.choose_year', ['program' => $programTitle], $lang);
+            // Only prompt to choose a track if:
+            // 1. The program has tracks, AND
+            // 2. The user changed program OR has not selected a track yet
+            if ($program->tracks()->where('is_active', true)->exists() && ($changedProgram || ! $user->track_id)) {
+                $text .= __('bot.tracks.choose_track', ['program' => $programTitle], $lang);
+
+                $backCallback = $program->degree_level ? "select_degree_{$program->degree_level}" : 'back_to_degrees';
+
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $text,
+                    ProgramMenuKeyboard::tracks($program, $lang, backCallback: $backCallback)
+                );
+
+                return;
+            }
+
+            $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
+            $text .= __('bot.courses.choose_year', ['program' => $programTitle . $trackTag], $lang);
 
             $this->telegram->editMessageText(
                 $chatId,
@@ -376,6 +524,92 @@ class CallbackQueryHandler
                 $messageId,
                 __('bot.courses.program_not_found', [], $lang),
                 ProgramMenuKeyboard::programmes($lang)
+            );
+        }
+    }
+
+    protected function handleSelectTrack(int $chatId, int $messageId, string $data, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+
+        if (str_ends_with($data, '_all')) {
+            $programId = (int) explode('_', $data)[1];
+            $program = Program::where('is_active', true)->find($programId);
+            if (! $program) {
+                return;
+            }
+
+            $user->update(['program_id' => $program->id, 'track_id' => null]);
+            $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+            $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $text,
+                ProgramMenuKeyboard::years($program, $lang)
+            );
+
+            return;
+        }
+
+        $trackId = (int) substr($data, strlen('track_'));
+        $track = Track::with('program')->where('is_active', true)->find($trackId);
+        if (! $track || ! $track->program) {
+            return;
+        }
+
+        $user->update([
+            'program_id' => $track->program_id,
+            'track_id' => $track->id,
+        ]);
+
+        $levelTag = $track->program->degree_level ? " ({$track->program->degree_level})" : '';
+        $text = __('bot.tracks.saved_track', ['track' => e($track->name)], $lang);
+        $text .= __('bot.courses.choose_year', ['program' => e($track->program->name) . $levelTag], $lang);
+
+        $this->telegram->editMessageText(
+            $chatId,
+            $messageId,
+            $text,
+            ProgramMenuKeyboard::years($track->program, $lang)
+        );
+    }
+
+    protected function handleSelectSubmitTrack(int $chatId, int $messageId, string $data, User $user): void
+    {
+        $lang = $user->preferred_language ?? 'en';
+
+        if (str_ends_with($data, '_all')) {
+            $programId = (int) explode('_', $data)[2];
+            $program = Program::where('is_active', true)->find($programId);
+            if ($program) {
+                $user->update(['program_id' => $program->id, 'track_id' => null]);
+                $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $text,
+                    ProgramMenuKeyboard::years($program, $lang, forSubmission: true)
+                );
+            }
+
+            return;
+        }
+
+        $trackId = (int) substr($data, strlen('submit_track_'));
+        $track = Track::with('program')->where('is_active', true)->find($trackId);
+        if ($track && $track->program) {
+            $user->update(['program_id' => $track->program_id, 'track_id' => $track->id]);
+            $levelTag = $track->program->degree_level ? " ({$track->program->degree_level})" : '';
+            $text = __('bot.tracks.saved_track', ['track' => e($track->name)], $lang);
+            $text .= __('bot.courses.choose_year', ['program' => e($track->program->name) . $levelTag], $lang);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $text,
+                ProgramMenuKeyboard::years($track->program, $lang, forSubmission: true)
             );
         }
     }
@@ -399,14 +633,18 @@ class CallbackQueryHandler
             ? __('bot.courses.year_all', [], $lang)
             : (__('bot.courses.year_' . $year, [], $lang) ?: "Year {$year}");
 
-        $text = "🎓 <b>" . e($program->name) . "{$levelTag}</b> — <b>{$yearLabel}</b>\n\n" .
-            __('bot.courses.choose_course', ['program' => e($program->name)], $lang);
+        $trackTag = ($user->track_id && $user->track)
+            ? " — 🎯 <i>" . e($user->track->name) . "</i>"
+            : '';
+
+        $text = "🎓 <b>" . e($program->name) . "{$levelTag}</b>{$trackTag} — <b>{$yearLabel}</b>\n\n" .
+            __('bot.courses.choose_course', [], $lang);
 
         $this->telegram->editMessageText(
             $chatId,
             $messageId,
             $text,
-            ProgramMenuKeyboard::courses($program, $lang, $year, $page, 8)
+            ProgramMenuKeyboard::courses($program, $lang, $year, $page, 8, $user->track_id)
         );
     }
 
@@ -442,11 +680,9 @@ class CallbackQueryHandler
 
         $programId = $parentProgram->id;
 
-        $resourceTypes = ResourceType::where('is_active', true)
-            ->orderBy('sort_order')
-            ->get();
+        $resourceTypes = ProgramMenuKeyboard::getActiveResourceTypes();
 
-        Log::debug("Resource Types for {$course->name}", ['content' => $resourceTypes]);
+        bot_log('telegram')->debug("Resource Types for {$course->name}", ['content' => $resourceTypes]);
 
         $this->telegram->editMessageText(
             $chatId,
@@ -470,13 +706,16 @@ class CallbackQueryHandler
         $page = (int) ($parts[6] ?? 1);
 
         $course = Course::find($courseId);
+        if (! $course || ! $course->is_active) {
+            return;
+        }
+
         $type = ResourceType::find($resourceTypeId);
 
         $resources = Resource::with('files')
             ->where('course_id', $courseId)
             ->where('resource_type_id', $resourceTypeId)
             ->where('status', 'approved')
-            ->whereHas('course', fn($query) => $query->where('is_active', true))
             ->get();
 
         $courseName = $course ? e($course->name) : '';
@@ -513,13 +752,18 @@ class CallbackQueryHandler
         }
 
         $programId = $parentProgram?->id ?? 0;
-        $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
+        $resourceTypes = ProgramMenuKeyboard::getActiveResourceTypes();
 
         $this->telegram->sendMessage(
             $chatId,
             __('bot.courses.choose_type', ['course' => e($course->name)], $lang),
             ProgramMenuKeyboard::resourceTypes($resourceTypes, $course->id, $programId, $lang, 'all')
         );
+    }
+
+    public function handleReportPromptDirect(int $chatId, int $resourceId, int $fileId, User $user): void
+    {
+        $this->handleReportPrompt($chatId, 0, $resourceId, $fileId, $user);
     }
 
     protected function handleSendResource(int $chatId, string $data, User $user): void
@@ -608,7 +852,7 @@ class CallbackQueryHandler
                     $failedTgFiles->push($file);
                 }
             } catch (ConnectionException $exception) {
-                Log::warning('Telegram document connection failed', ['file_id' => $file->id]);
+                bot_log('telegram')->warning('Telegram document connection failed', ['file_id' => $file->id]);
                 $failedTgFiles->push($file);
             }
         }
@@ -929,7 +1173,7 @@ class CallbackQueryHandler
         $uploadHandler->notifyAdminsForResource($resource, $user);
 
         $courseName = $resource->course ? e($resource->course->name) : 'Course';
-        $count = $resource->files->count();
+        $count = $resource->files()->count();
 
         $this->telegram->editMessageText(
             $chatId,

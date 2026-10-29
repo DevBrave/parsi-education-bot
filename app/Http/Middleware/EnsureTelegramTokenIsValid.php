@@ -25,7 +25,7 @@ class EnsureTelegramTokenIsValid
 
         // If secret is not configured in non-local environments, reject securely
         if (empty($configuredSecret)) {
-            Log::error('Telegram webhook rejected: TELEGRAM_WEBHOOK_SECRET is not configured on server.');
+            bot_log('telegram')->error('Telegram webhook rejected: TELEGRAM_WEBHOOK_SECRET is not configured on server.');
 
             return response('Server configuration error', 500);
         }
@@ -33,7 +33,7 @@ class EnsureTelegramTokenIsValid
         $incomingToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
 
         if (! is_string($incomingToken) || ! hash_equals($configuredSecret, $incomingToken)) {
-            Log::warning('Telegram webhook rejected: invalid secret token', [
+            bot_log('telegram')->warning('Telegram webhook rejected: invalid secret token', [
                 'ip' => $request->ip(),
             ]);
 

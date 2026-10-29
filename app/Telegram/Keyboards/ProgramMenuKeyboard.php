@@ -6,58 +6,262 @@ use App\Models\Course;
 use App\Models\Program;
 use App\Models\ResourceType;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class ProgramMenuKeyboard
 {
     /**
-     * Build inline keyboard of active programmes from database.
+     * Educational Resources Hub inline keyboard.
      */
-    public static function programmes(?string $lang = 'en'): array
+    public static function educationHub(?string $lang = 'en'): array
     {
         $lang = $lang ?: 'en';
-        $programs = Program::where('is_active', true)->orderBy('name')->get();
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.education_hub.browse_btn', [], $lang), 'callback_data' => 'edu_browse'],
+                ],
+                [
+                    ['text' => __('bot.education_hub.search_btn', [], $lang), 'callback_data' => 'search_prompt'],
+                ],
+                [
+                    ['text' => __('bot.education_hub.submit_btn', [], $lang), 'callback_data' => 'edu_submit_start'],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Build inline keyboard of active programmes from database.
+     */
+    public static function programmes(?string $lang = 'en', string $backCallback = 'back_edu_hub', bool $forSubmission = false): array
+    {
+        $lang = $lang ?: 'en';
+        $prefix = $forSubmission ? 'submit_prog_' : 'prog_';
+        $programs = Cache::remember('catalog:programs:active', now()->addDay(), function () {
+            return Program::where('is_active', true)->orderBy('name')->get();
+        });
+
+        if (! is_iterable($programs) || $programs instanceof \__PHP_Incomplete_Class) {
+            Cache::forget('catalog:programs:active');
+            $programs = Program::where('is_active', true)->orderBy('name')->get();
+        }
 
         $rows = [];
         foreach ($programs as $program) {
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
             $rows[] = [
-                ['text' => "🎓 {$program->name}{$levelTag}", 'callback_data' => "prog_{$program->id}"],
+                ['text' => "🎓 {$program->name}{$levelTag}", 'callback_data' => "{$prefix}{$program->id}"],
             ];
         }
 
+        $backText = $backCallback === 'back_edu_hub'
+            ? __('bot.courses.back_edu', [], $lang)
+            : __('bot.courses.back_main', [], $lang);
+
         $rows[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
+            ['text' => $backText, 'callback_data' => $backCallback],
         ];
 
         return ['inline_keyboard' => $rows];
     }
 
+
+    /**
+     * Build inline keyboard of active degree levels (BSc, MSc, etc.).
+     */
+    public static function degrees(string $lang = 'en', ?string $backCallback = null): array
+    {
+        $lang = $lang ?: 'en';
+        // 1. Pluck returns a clean collection of strings: ['BSc', 'MSc']
+        $degrees = Cache::remember('catalog:degrees:unique_levels', now()->addDay(), function () {
+            return Program::where('is_active', true)
+                ->whereNotNull('degree_level')
+                ->distinct()
+                ->orderBy('degree_level')
+                ->pluck('degree_level');
+        });
+
+        if (! is_iterable($degrees) || $degrees instanceof \__PHP_Incomplete_Class) {
+            Cache::forget('catalog:degrees:unique_levels');
+            $degrees = Program::where('is_active', true)
+                ->whereNotNull('degree_level')
+                ->distinct()
+                ->orderBy('degree_level')
+                ->pluck('degree_level');
+        }
+
+        $buttons = [];
+        foreach ($degrees as $degree) {
+            $degreeStr = (string) $degree;
+            $buttons[] = [
+                [
+                    'text' => "🎓 {$degreeStr}",
+                    'callback_data' => "select_degree_{$degreeStr}",
+                ],
+            ];
+        }
+
+        if ($backCallback) {
+            $backText = $backCallback === 'back_edu_hub'
+                ? __('bot.courses.back_edu', [], $lang)
+                : __('bot.courses.back_main', [], $lang);
+
+            $buttons[] = [
+                [
+                    'text' => $backText,
+                    'callback_data' => $backCallback,
+                ],
+            ];
+        }
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Build inline keyboard of programs belonging to a specific degree level.
+     */
+    public static function programsByDegree(string $degreeLevel, string $lang = 'en', string $backCallback = 'back_to_degrees'): array
+    {
+        $lang = $lang ?: 'en';
+        $cacheKey = "catalog:programs:degree_{$degreeLevel}";
+
+        $programs = Cache::remember($cacheKey, now()->addDay(), function () use ($degreeLevel) {
+            return Program::where('is_active', true)
+                ->where('degree_level', $degreeLevel)
+                ->orderBy('name')
+                ->get();
+        });
+
+        if (! is_iterable($programs) || $programs instanceof \__PHP_Incomplete_Class) {
+            Cache::forget($cacheKey);
+            $programs = Program::where('is_active', true)
+                ->where('degree_level', $degreeLevel)
+                ->orderBy('name')
+                ->get();
+        }
+
+        $buttons = [];
+        foreach ($programs as $program) {
+            $buttons[] = [
+                [
+                    'text' => "📘 {$program->name}",
+                    'callback_data' => "select_program_{$program->id}",
+                ],
+            ];
+        }
+
+        $backText = __('bot.onboarding.back_degrees', [], $lang) ?: '⬅️ Back to Degree Levels';
+
+        $buttons[] = [
+            [
+                'text' => $backText,
+                'callback_data' => $backCallback,
+            ],
+        ];
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Build inline keyboard of active specialization tracks for a programme.
+     */
+    public static function tracks(
+        Program $program,
+        ?string $lang = 'en',
+        string $backCallback = 'change_program',
+        bool $forSubmission = false,
+        ?string $customPrefix = null
+    ): array {
+        $lang = $lang ?: 'en';
+        if ($customPrefix !== null) {
+            $prefix = $customPrefix;
+        } else {
+            $prefix = $forSubmission ? 'submit_track_' : 'track_';
+        }
+
+        $cacheKey = "catalog:tracks:program_{$program->id}";
+
+        $tracks = Cache::remember($cacheKey, now()->addDay(), function () use ($program) {
+            return $program->tracks()->where('is_active', true)->orderBy('name')->get();
+        });
+
+        if (! is_iterable($tracks) || $tracks instanceof \__PHP_Incomplete_Class) {
+            Cache::forget($cacheKey);
+            $tracks = $program->tracks()->where('is_active', true)->orderBy('name')->get();
+        }
+
+        $buttons = [];
+        foreach ($tracks as $track) {
+            $codeTag = $track->code ? " [{$track->code}]" : '';
+            $buttons[] = [
+                ['text' => "🎯 {$track->name}{$codeTag}", 'callback_data' => "{$prefix}{$track->id}"],
+            ];
+        }
+
+        $backText = str_starts_with($backCallback, 'select_degree_')
+            ? (__('bot.tracks.back_to_programs', [], $lang) ?: '⬅️ Back to Programs')
+            : __('bot.courses.change_program', [], $lang);
+
+        $buttons[] = [
+            ['text' => $backText, 'callback_data' => $backCallback],
+        ];
+
+        return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Get active academic years for a program (cached 24h as scalar array).
+     */
+    public static function getProgramYears(Program $program): array
+    {
+        $defaultYears = $program->defaultYears();
+        $cacheKey = "catalog:years:program_{$program->id}";
+        $distinctYears = Cache::remember($cacheKey, now()->addDay(), function () use ($program, $defaultYears) {
+            $years = $program->courses()
+                ->where('is_active', true)
+                ->whereNotNull('year')
+                ->distinct()
+                ->pluck('year')
+                ->sort()
+                ->values()
+                ->all();
+
+            return empty($years) ? $defaultYears : $years;
+        });
+
+        if (! is_iterable($distinctYears) || $distinctYears instanceof \__PHP_Incomplete_Class) {
+            Cache::forget($cacheKey);
+            $distinctYears = $defaultYears;
+        }
+
+        return array_values((array) $distinctYears);
+    }
+
     /**
      * Build inline keyboard of academic years for a programme.
      */
-    public static function years(Program $program, ?string $lang = 'en', bool $forSubmission = false): array
+    public static function years(Program $program, ?string $lang = 'en', bool $forSubmission = false, ?string $backCallback = null): array
     {
         $lang = $lang ?: 'en';
         $prefix = $forSubmission ? 'submit_year' : 'course_year';
-        $backCallback = $forSubmission ? 'back_main_submit' : 'back_main_educational_files';
+        $backCallback = $backCallback ?? 'back_edu_hub';
 
-        // Detect years present in this program's active courses
-        $distinctYears = $program->courses()
-            ->where('is_active', true)
-            ->whereNotNull('year')
-            ->distinct()
-            ->pluck('year')
-            ->sort()
-            ->values();
-
-        if ($distinctYears->isEmpty()) {
-            $distinctYears = collect([1, 2, 3]);
-        }
+        $distinctYears = self::getProgramYears($program);
 
         $buttons = [];
         $yearRow = [];
 
         foreach ($distinctYears as $year) {
+            if (! is_numeric($year)) {
+                continue;
+            }
+
             $key = "year_{$year}";
             $yearLabel = __('bot.courses.' . $key, [], $lang);
             if ($yearLabel === 'bot.courses.' . $key) {
@@ -85,12 +289,23 @@ class ProgramMenuKeyboard
             ['text' => __('bot.courses.year_all', [], $lang), 'callback_data' => "{$prefix}_{$program->id}_all_1"],
         ];
 
+        if ($program->tracks()->where('is_active', true)->exists()) {
+            $trackCallback = $forSubmission ? "submit_change_track_{$program->id}" : "change_track_{$program->id}";
+            $buttons[] = [
+                ['text' => __('bot.tracks.change_track', [], $lang), 'callback_data' => $trackCallback],
+            ];
+        }
+
         $buttons[] = [
             ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
         ];
 
+        $backText = $backCallback === 'back_edu_hub'
+            ? __('bot.courses.back_edu', [], $lang)
+            : __('bot.courses.back_main', [], $lang);
+
         $buttons[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => $backCallback],
+            ['text' => $backText, 'callback_data' => $backCallback],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -99,26 +314,56 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of active courses for a programme, filtered by year and paginated.
      */
-    public static function courses(Program $program, ?string $lang = 'en', $year = 'all', int $page = 1, int $perPage = 8): array
+    public static function courses(Program $program, ?string $lang = 'en', $year = 'all', int $page = 1, int $perPage = 8, ?int $trackId = null): array
     {
         $lang = $lang ?: 'en';
-        $query = $program->courses()->where('is_active', true)->orderBy('name');
+        // Cache all courses for this program, track, and year for 24 hours as scalar array
+        $trackSuffix = $trackId ? ":track_{$trackId}" : ":track_all";
+        $cacheKey = "catalog:courses:program_{$program->id}{$trackSuffix}:year_{$year}";
+        $allCourses = Cache::remember($cacheKey, now()->addDay(), function () use ($program, $year, $trackId) {
+            $query = $program->courses()->where('is_active', true)->orderBy('name');
 
-        if ($year !== 'all' && is_numeric($year)) {
-            $query->where('year', (int) $year);
+            if ($trackId) {
+                $query->where(function ($q) use ($trackId) {
+                    $q->whereDoesntHave('tracks')
+                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                });
+            }
+
+            if ($year !== 'all' && is_numeric($year)) {
+                $query->where('year', (int) $year);
+            }
+
+            return $query->select(['courses.id', 'courses.name'])->get()->toArray();
+        });
+
+        if (! is_array($allCourses)) {
+            Cache::forget($cacheKey);
+            $query = $program->courses()->where('is_active', true)->orderBy('name');
+            if ($trackId) {
+                $query->where(function ($q) use ($trackId) {
+                    $q->whereDoesntHave('tracks')
+                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                });
+            }
+            if ($year !== 'all' && is_numeric($year)) {
+                $query->where('year', (int) $year);
+            }
+            $allCourses = $query->select(['courses.id', 'courses.name'])->get()->toArray();
         }
 
-        $allCourses = $query->get();
-        $total = $allCourses->count();
+        $total = count($allCourses);
         $totalPages = max(1, (int) ceil($total / $perPage));
         $currentPage = min(max(1, $page), $totalPages);
-        $coursesPage = $allCourses->forPage($currentPage, $perPage);
+        $offset = ($currentPage - 1) * $perPage;
+        $coursesPage = array_slice($allCourses, $offset, $perPage);
 
         $courseButtons = [];
         foreach ($coursesPage as $course) {
-            
+            $courseId = is_array($course) ? $course['id'] : $course->id;
+            $courseName = is_array($course) ? $course['name'] : $course->name;
             $courseButtons[] = [
-                ['text' => "📖 {$course->name}", 'callback_data' => "course_{$course->id}_{$program->id}_{$year}"],
+                ['text' => "📖 {$courseName}", 'callback_data' => "course_{$courseId}_{$program->id}_{$year}"],
             ];
         }
 
@@ -128,8 +373,46 @@ class ProgramMenuKeyboard
             ];
         }
 
-        // Pagination buttons row (e.g. ◀️ Prev | 1/2 | Next ▶️)
-        if ($totalPages > 1) {
+        // Pagination buttons row:
+        // - When browsing a specific year: [◀️ Prev] [2nd Year] [Next ▶️] switches between years
+        // - When browsing all courses: [◀️ Prev] [Page 1/3] [Next ▶️] paginates pages
+        if ($year !== 'all' && is_numeric($year)) {
+            $currentYear = (int) $year;
+            $availableYears = self::getProgramYears($program);
+            $currentIndex = array_search($currentYear, $availableYears);
+
+            if ($currentIndex !== false) {
+                $prevYear = ($currentIndex > 0) ? $availableYears[$currentIndex - 1] : null;
+                $nextYear = ($currentIndex < count($availableYears) - 1) ? $availableYears[$currentIndex + 1] : null;
+
+                $paginationRow = [];
+                if ($prevYear !== null) {
+                    $paginationRow[] = [
+                        'text' => __('bot.courses.prev_page', [], $lang),
+                        'callback_data' => "course_year_{$program->id}_{$prevYear}_1",
+                    ];
+                }
+
+                $yearLabel = __('bot.courses.year_' . $currentYear, [], $lang);
+                if ($yearLabel === 'bot.courses.year_' . $currentYear) {
+                    $yearLabel = "Year {$currentYear}";
+                }
+
+                $paginationRow[] = [
+                    'text' => $yearLabel,
+                    'callback_data' => 'noop',
+                ];
+
+                if ($nextYear !== null) {
+                    $paginationRow[] = [
+                        'text' => __('bot.courses.next_page', [], $lang),
+                        'callback_data' => "course_year_{$program->id}_{$nextYear}_1",
+                    ];
+                }
+
+                $courseButtons[] = $paginationRow;
+            }
+        } elseif ($totalPages > 1) {
             $paginationRow = [];
             if ($currentPage > 1) {
                 $paginationRow[] = [
@@ -154,15 +437,21 @@ class ProgramMenuKeyboard
         }
 
         $courseButtons[] = [
-            ['text' => __('bot.courses.change_year', [], $lang), 'callback_data' => "prog_{$program->id}"],
+            ['text' => __('bot.courses.change_year', [], $lang), 'callback_data' => "prog_years_{$program->id}"],
         ];
+
+        if ($program->tracks()->where('is_active', true)->exists()) {
+            $courseButtons[] = [
+                ['text' => __('bot.tracks.change_track', [], $lang), 'callback_data' => "change_track_{$program->id}"],
+            ];
+        }
 
         $courseButtons[] = [
             ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
         ];
 
         $courseButtons[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
+            ['text' => __('bot.courses.back_edu', [], $lang), 'callback_data' => 'back_edu_hub'],
         ];
 
         return ['inline_keyboard' => $courseButtons];
@@ -171,25 +460,56 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of active courses for submitting materials.
      */
-    public static function submitCourses(Program $program, ?string $lang = 'en', $year = 'all', int $page = 1, int $perPage = 8): array
+    public static function submitCourses(Program $program, ?string $lang = 'en', $year = 'all', int $page = 1, int $perPage = 8, ?int $trackId = null): array
     {
         $lang = $lang ?: 'en';
-        $query = $program->courses()->where('is_active', true)->orderBy('name');
+        // Cache all courses for this program, track, and year for 24 hours
+        $trackSuffix = $trackId ? ":track_{$trackId}" : ":track_all";
+        $cacheKey = "catalog:courses:program_{$program->id}{$trackSuffix}:year_{$year}";
+        $allCourses = Cache::remember($cacheKey, now()->addDay(), function () use ($program, $year, $trackId) {
+            $query = $program->courses()->where('is_active', true)->orderBy('name');
 
-        if ($year !== 'all' && is_numeric($year)) {
-            $query->where('year', (int) $year);
+            if ($trackId) {
+                $query->where(function ($q) use ($trackId) {
+                    $q->whereDoesntHave('tracks')
+                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                });
+            }
+
+            if ($year !== 'all' && is_numeric($year)) {
+                $query->where('year', (int) $year);
+            }
+
+            return $query->select(['courses.id', 'courses.name'])->get()->toArray();
+        });
+
+        if (! is_array($allCourses)) {
+            Cache::forget($cacheKey);
+            $query = $program->courses()->where('is_active', true)->orderBy('name');
+            if ($trackId) {
+                $query->where(function ($q) use ($trackId) {
+                    $q->whereDoesntHave('tracks')
+                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                });
+            }
+            if ($year !== 'all' && is_numeric($year)) {
+                $query->where('year', (int) $year);
+            }
+            $allCourses = $query->select(['courses.id', 'courses.name'])->get()->toArray();
         }
 
-        $allCourses = $query->get();
-        $total = $allCourses->count();
+        $total = count($allCourses);
         $totalPages = max(1, (int) ceil($total / $perPage));
         $currentPage = min(max(1, $page), $totalPages);
-        $coursesPage = $allCourses->forPage($currentPage, $perPage);
+        $offset = ($currentPage - 1) * $perPage;
+        $coursesPage = array_slice($allCourses, $offset, $perPage);
 
         $buttons = [];
         foreach ($coursesPage as $course) {
+            $courseId = is_array($course) ? $course['id'] : $course->id;
+            $courseName = is_array($course) ? $course['name'] : $course->name;
             $buttons[] = [
-                ['text' => "📤 {$course->name}", 'callback_data' => "submit_course_{$course->id}_{$program->id}_{$year}"],
+                ['text' => "📤 {$courseName}", 'callback_data' => "submit_course_{$courseId}_{$program->id}_{$year}"],
             ];
         }
 
@@ -199,7 +519,46 @@ class ProgramMenuKeyboard
             ];
         }
 
-        if ($totalPages > 1) {
+        // Pagination buttons row:
+        // - When browsing a specific year: [◀️ Prev] [2nd Year] [Next ▶️] switches between years
+        // - When browsing all courses: [◀️ Prev] [Page 1/3] [Next ▶️] paginates pages
+        if ($year !== 'all' && is_numeric($year)) {
+            $currentYear = (int) $year;
+            $availableYears = self::getProgramYears($program);
+            $currentIndex = array_search($currentYear, $availableYears);
+
+            if ($currentIndex !== false) {
+                $prevYear = ($currentIndex > 0) ? $availableYears[$currentIndex - 1] : null;
+                $nextYear = ($currentIndex < count($availableYears) - 1) ? $availableYears[$currentIndex + 1] : null;
+
+                $paginationRow = [];
+                if ($prevYear !== null) {
+                    $paginationRow[] = [
+                        'text' => __('bot.courses.prev_page', [], $lang),
+                        'callback_data' => "submit_year_{$program->id}_{$prevYear}_1",
+                    ];
+                }
+
+                $yearLabel = __('bot.courses.year_' . $currentYear, [], $lang);
+                if ($yearLabel === 'bot.courses.year_' . $currentYear) {
+                    $yearLabel = "Year {$currentYear}";
+                }
+
+                $paginationRow[] = [
+                    'text' => $yearLabel,
+                    'callback_data' => 'noop',
+                ];
+
+                if ($nextYear !== null) {
+                    $paginationRow[] = [
+                        'text' => __('bot.courses.next_page', [], $lang),
+                        'callback_data' => "submit_year_{$program->id}_{$nextYear}_1",
+                    ];
+                }
+
+                $buttons[] = $paginationRow;
+            }
+        } elseif ($totalPages > 1) {
             $paginationRow = [];
             if ($currentPage > 1) {
                 $paginationRow[] = [
@@ -224,14 +583,44 @@ class ProgramMenuKeyboard
         }
 
         $buttons[] = [
-            ['text' => __('bot.courses.change_year', [], $lang), 'callback_data' => "submit_prog_{$program->id}"],
+            ['text' => __('bot.courses.change_year', [], $lang), 'callback_data' => "submit_prog_years_{$program->id}"],
         ];
 
+        if ($program->tracks()->where('is_active', true)->exists()) {
+            $buttons[] = [
+                ['text' => __('bot.tracks.change_track', [], $lang), 'callback_data' => "submit_change_track_{$program->id}"],
+            ];
+        }
+
         $buttons[] = [
-            ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_submit'],
+            ['text' => __('bot.courses.back_edu', [], $lang), 'callback_data' => 'back_edu_hub'],
         ];
 
         return ['inline_keyboard' => $buttons];
+    }
+
+    /**
+     * Get active resource types safely from cache as pure primitive arrays.
+     */
+    public static function getActiveResourceTypes(): array
+    {
+        $types = Cache::remember('catalog:resource_types:active_array', now()->addDay(), function () {
+            return ResourceType::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['id', 'display_name', 'code', 'sort_order'])
+                ->toArray();
+        });
+
+        if (! is_array($types)) {
+            Cache::forget('catalog:resource_types:active_array');
+
+            return ResourceType::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['id', 'display_name', 'code', 'sort_order'])
+                ->toArray();
+        }
+
+        return $types;
     }
 
     /**
@@ -240,15 +629,18 @@ class ProgramMenuKeyboard
     public static function submitResourceTypes(Course $course, int $programId, $year = 'all', ?string $lang = 'en'): array
     {
         $lang = $lang ?: 'en';
-        $types = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
+        $types = self::getActiveResourceTypes();
 
         $buttons = [];
         $row = [];
 
         foreach ($types as $type) {
+            $id = is_array($type) ? ($type['id'] ?? 0) : ($type->id ?? 0);
+            $name = is_array($type) ? ($type['display_name'] ?? '') : ($type->display_name ?? '');
+
             $row[] = [
-                'text' => "📁 {$type->display_name}",
-                'callback_data' => "submit_type_{$course->id}_{$type->id}",
+                'text' => "📁 {$name}",
+                'callback_data' => "submit_type_{$course->id}_{$id}",
             ];
 
             if (count($row) === 2) {
@@ -271,13 +663,16 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of resource types for a course.
      */
-    public static function resourceTypes(Collection $resourceTypes, int $courseId, int $programId, ?string $lang = 'en', $year = 'all'): array
+    public static function resourceTypes(iterable $resourceTypes, int $courseId, int $programId, ?string $lang = 'en', $year = 'all'): array
     {
         $lang = $lang ?: 'en';
         $buttons = [];
         foreach ($resourceTypes as $type) {
+            $id = is_array($type) ? ($type['id'] ?? 0) : ($type->id ?? 0);
+            $name = is_array($type) ? ($type['display_name'] ?? '') : ($type->display_name ?? '');
+
             $buttons[] = [
-                ['text' => "📖 {$type->display_name}", 'callback_data' => "resource_type_{$type->id}_{$courseId}_{$programId}_{$year}_1"],
+                ['text' => "📖 {$name}", 'callback_data' => "resource_type_{$id}_{$courseId}_{$programId}_{$year}_1"],
             ];
         }
 
@@ -292,6 +687,8 @@ class ProgramMenuKeyboard
 
         $buttons[] = [
             ['text' => __('bot.courses.back_courses', [], $lang), 'callback_data' => "course_year_{$programId}_{$year}_1"],
+            // ['text' => __('bot.reports.button', [], $lang), 'callback_data' => "report_prompt_{$courseId}"], // Report the course
+
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -423,7 +820,7 @@ class ProgramMenuKeyboard
         if ($showNavigation) {
             $buttons[] = [
                 ['text' => __('bot.search.search_again', [], $lang), 'callback_data' => 'search_prompt'],
-                ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main'],
+                ['text' => __('bot.courses.back_edu', [], $lang), 'callback_data' => 'back_edu_hub'],
             ];
         }
 
@@ -440,7 +837,7 @@ class ProgramMenuKeyboard
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => __('bot.search.cancel', [], $lang), 'callback_data' => 'back_main'],
+                    ['text' => __('bot.search.cancel', [], $lang), 'callback_data' => 'cancel_search'],
                 ],
             ],
         ];
@@ -485,9 +882,6 @@ class ProgramMenuKeyboard
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => __('bot.contact.report_material_btn', [], $lang), 'callback_data' => 'search_prompt'],
-                ],
-                [
                     ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'contact_prompt'],
                 ],
                 [
@@ -495,6 +889,106 @@ class ProgramMenuKeyboard
                 ],
                 [
                     ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_contact'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Report Menu inline keyboard.
+     */
+    public static function reportMenu(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.report.report_material_btn', [], $lang), 'callback_data' => 'search_prompt'],
+                ],
+                [
+                    ['text' => __('bot.report.send_report_btn', [], $lang), 'callback_data' => 'contact_prompt'],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_report'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * PARSI Educational Guides & Tutorials inline keyboard.
+     */
+    public static function tutorialsMenu(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $channel = ltrim(config('telegram.channel_username', 'PARSI_POLITO'), '@');
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.tutorials.edisu_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
+                ],
+                [
+                    ['text' => __('bot.tutorials.enrollment_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
+                ],
+                [
+                    ['text' => __('bot.tutorials.didattica_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
+                ],
+                [
+                    ['text' => __('bot.tutorials.permesso_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
+                ],
+                [
+                    ['text' => __('bot.tutorials.channel_guides_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_tutorials'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * About Us inline keyboard.
+     */
+    public static function aboutUsMenu(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+        $channel = config('telegram.channel_username', 'PARSI_POLITO');
+        $instagram_page = config('telegram.instagram_link', 'https://www.instagram.com/parsi___polito/');
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.about.members_btn', [], $lang), 'callback_data' => 'about_members'],
+                ],
+                [
+                    ['text' => __('bot.about.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
+                ],
+                [
+                    ['text' => __('bot.about.insta_btn', [], $lang), 'url' => str_starts_with($instagram_page, 'http') ? $instagram_page : 'https://www.instagram.com/' . ltrim($instagram_page, '@/ ')],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_about'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * About Us Members inline keyboard.
+     */
+    public static function aboutMembersMenu(?string $lang = 'en'): array
+    {
+        $lang = $lang ?: 'en';
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => __('bot.about.back_about', [], $lang), 'callback_data' => 'back_about'],
+                ],
+                [
+                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_about'],
                 ],
             ],
         ];

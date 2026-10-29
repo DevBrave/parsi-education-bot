@@ -3,10 +3,12 @@
 namespace App\Telegram\Handlers;
 
 use App\Models\Program;
+use App\Models\Track;
 use App\Models\User;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use App\Telegram\Keyboards\OnboardingKeyboard;
+use App\Telegram\Keyboards\ProgramMenuKeyboard;
 
 class OnboardingHandler
 {
@@ -40,8 +42,20 @@ class OnboardingHandler
                 return $this->handleLanguageSelection($chatId, $messageId, $callbackId, $data, $user);
             }
 
-            if (str_starts_with($data, 'onboard_prog_')) {
+            if (str_starts_with($data, 'select_degree_') || str_starts_with($data, 'onboard_degree_')) {
+                return $this->handleDegreeSelection($chatId, $messageId, $callbackId, $data, $user);
+            }
+
+            if ($data === 'back_to_degrees' || $data === 'onboard_back_degrees') {
+                return $this->handleBackToDegrees($chatId, $messageId, $callbackId, $user);
+            }
+
+            if (str_starts_with($data, 'select_program_') || str_starts_with($data, 'onboard_prog_')) {
                 return $this->handleProgramSelection($chatId, $messageId, $callbackId, $data, $user);
+            }
+
+            if (str_starts_with($data, 'onboard_track_') || str_starts_with($data, 'track_')) {
+                return $this->handleTrackSelection($chatId, $messageId, $callbackId, $data, $user);
             }
         }
 
@@ -58,7 +72,7 @@ class OnboardingHandler
         }
 
         if (! $user->program_id) {
-            $this->promptProgram($chatId, $user->preferred_language);
+            $this->promptDegreeLevel($chatId, $user->preferred_language);
 
             return true;
         }
@@ -76,17 +90,48 @@ class OnboardingHandler
     }
 
     /**
-     * Send Step 2: Degree programme selection prompt.
+     * Send Step 2a: Degree level selection prompt (BSc / MSc).
+     */
+    public function promptDegreeLevel(int $chatId, string $lang, ?int $messageId = null): void
+    {
+        $text = __('bot.onboarding.degree_prompt', [], $lang);
+
+        if ($messageId) {
+            $this->telegram->editMessageText($chatId, $messageId, $text, OnboardingKeyboard::degrees($lang));
+        } else {
+            $this->telegram->sendMessage($chatId, $text, OnboardingKeyboard::degrees($lang));
+        }
+    }
+
+    /**
+     * Send Step 2b: Programs belonging to the chosen degree level.
+     */
+    public function promptProgramsByDegree(int $chatId, string $degreeLevel, string $lang, ?int $messageId = null): void
+    {
+        $text = __('bot.onboarding.programs_by_degree_prompt', ['degree' => $degreeLevel], $lang);
+
+        if ($messageId) {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $text,
+                OnboardingKeyboard::programsByDegree($degreeLevel, $lang)
+            );
+        } else {
+            $this->telegram->sendMessage(
+                $chatId,
+                $text,
+                OnboardingKeyboard::programsByDegree($degreeLevel, $lang)
+            );
+        }
+    }
+
+    /**
+     * Legacy/Fallback: Send degree programme selection prompt.
      */
     public function promptProgram(int $chatId, string $lang, ?int $messageId = null): void
     {
-        $text = __('bot.onboarding.program_prompt', [], $lang);
-
-        if ($messageId) {
-            $this->telegram->editMessageText($chatId, $messageId, $text, OnboardingKeyboard::programmes());
-        } else {
-            $this->telegram->sendMessage($chatId, $text, OnboardingKeyboard::programmes());
-        }
+        $this->promptDegreeLevel($chatId, $lang, $messageId);
     }
 
     /**
@@ -116,15 +161,57 @@ class OnboardingHandler
             $progName = $program ? $program->name : 'Your Degree';
             $this->finishOnboarding($chatId, $messageId, $user, $progName);
         } else {
-            // Prompt for Step 2: Degree Programme
-            $this->promptProgram($chatId, $lang, $messageId);
+            // Prompt for Step 2: Degree Level (BSc / MSc)
+            $this->promptDegreeLevel($chatId, $lang, $messageId);
         }
 
         return true;
     }
 
     /**
-     * Process degree programme callback selection.
+     * Process degree level selection (Step 2a).
+     */
+    protected function handleDegreeSelection(
+        int $chatId,
+        ?int $messageId,
+        ?string $callbackId,
+        string $data,
+        User $user
+    ): bool {
+        $prefix = str_starts_with($data, 'select_degree_') ? 'select_degree_' : 'onboard_degree_';
+        $degreeLevel = substr($data, strlen($prefix));
+
+        if ($callbackId) {
+            $this->telegram->answerCallbackQuery($callbackId);
+        }
+
+        $lang = $user->preferred_language ?? 'en';
+        $this->promptProgramsByDegree($chatId, $degreeLevel, $lang, $messageId);
+
+        return true;
+    }
+
+    /**
+     * Process "Back to Degree Levels" callback button.
+     */
+    protected function handleBackToDegrees(
+        int $chatId,
+        ?int $messageId,
+        ?string $callbackId,
+        User $user
+    ): bool {
+        if ($callbackId) {
+            $this->telegram->answerCallbackQuery($callbackId);
+        }
+
+        $lang = $user->preferred_language ?? 'en';
+        $this->promptDegreeLevel($chatId, $lang, $messageId);
+
+        return true;
+    }
+
+    /**
+     * Process degree programme callback selection (Step 2b).
      */
     protected function handleProgramSelection(
         int $chatId,
@@ -133,8 +220,9 @@ class OnboardingHandler
         string $data,
         User $user
     ): bool {
-        $programId = (int) substr($data, strlen('onboard_prog_'));
-        $program = Program::find($programId);
+        $prefix = str_starts_with($data, 'select_program_') ? 'select_program_' : 'onboard_prog_';
+        $programId = (int) substr($data, strlen($prefix));
+        $program = Program::with('tracks')->find($programId);
 
         if (! $program) {
             return false;
@@ -144,11 +232,79 @@ class OnboardingHandler
             $this->telegram->answerCallbackQuery($callbackId);
         }
 
-        $user->update(['program_id' => $program->id]);
+        $user->update(['program_id' => $program->id, 'track_id' => null]);
+        $lang = $user->preferred_language ?? 'en';
+
+        // If this program has specialization tracks (e.g. Master's in Computer Engineering),
+        // show Step 2c: Track / inner major selection!
+        if ($program->tracks()->where('is_active', true)->exists()) {
+            $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
+            $programTitle = e($program->name) . $levelTag;
+            $text = __('bot.tracks.choose_track', ['program' => $programTitle], $lang);
+
+            $backCallback = $program->degree_level ? "select_degree_{$program->degree_level}" : 'back_to_degrees';
+            $keyboard = ProgramMenuKeyboard::tracks(
+                $program,
+                $lang,
+                backCallback: $backCallback,
+                customPrefix: 'onboard_track_'
+            );
+
+            if ($messageId) {
+                $this->telegram->editMessageText($chatId, $messageId, $text, $keyboard);
+            } else {
+                $this->telegram->sendMessage($chatId, $text, $keyboard);
+            }
+
+            return true;
+        }
 
         $this->finishOnboarding($chatId, $messageId, $user, $program->name);
 
         return true;
+    }
+
+    /**
+     * Process specialization track callback selection (Step 2c of onboarding).
+     */
+    protected function handleTrackSelection(
+        int $chatId,
+        ?int $messageId,
+        ?string $callbackId,
+        string $data,
+        User $user
+    ): bool {
+        if ($callbackId) {
+            $this->telegram->answerCallbackQuery($callbackId);
+        }
+
+        if (str_contains($data, 'all_') || str_ends_with($data, '_all')) {
+            $parts = explode('_', $data);
+            $programId = (int) end($parts);
+            $program = Program::find($programId) ?? $user->program;
+            $user->update(['track_id' => null]);
+            $progName = $program ? $program->name : 'Your Degree';
+            $this->finishOnboarding($chatId, $messageId, $user, $progName);
+
+            return true;
+        }
+
+        $prefix = str_starts_with($data, 'onboard_track_') ? 'onboard_track_' : 'track_';
+        $trackId = (int) substr($data, strlen($prefix));
+        $track = Track::with('program')->find($trackId);
+
+        if ($track) {
+            $user->update([
+                'program_id' => $track->program_id,
+                'track_id' => $track->id,
+            ]);
+            $progTitle = $track->program ? "{$track->program->name} — {$track->name}" : $track->name;
+            $this->finishOnboarding($chatId, $messageId, $user, $progTitle);
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
