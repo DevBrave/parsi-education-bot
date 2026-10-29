@@ -82,16 +82,24 @@
     </div>
     <!-- Attached Files Management Card -->
     <div class="card" style="border: 1px solid var(--border); overflow: hidden;">
-        <div class="card-header" style="background: #f8fafc;">
+        <div class="card-header" style="background: #f8fafc; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                     📁 Attached Documents
                     <span class="badge" style="background: var(--primary-light); color: var(--primary); font-size: 0.75rem;">
                         {{ $resource->files->count() }} {{ \Illuminate\Support\Str::plural('file', $resource->files->count()) }}
                     </span>
                 </h2>
-                <p>Manage existing documents or delete obsolete ones</p>
+                <p style="margin: 0.2rem 0 0 0;">Manage existing documents or delete obsolete ones</p>
             </div>
+            @if($resource->files->isNotEmpty())
+                <form action="{{ route('admin.resources.sync-drive', $resource) }}" method="POST" style="margin: 0;">
+                    @csrf
+                    <button type="submit" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600;" title="Click to manually sync unsynced files to Google Drive">
+                        ☁️ Sync to Google Drive
+                    </button>
+                </form>
+            @endif
         </div>
 
         @if($resource->files->isEmpty())

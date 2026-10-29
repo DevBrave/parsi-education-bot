@@ -125,6 +125,11 @@ class ReportAdminController extends Controller
             'admin_notes' => $request->input('admin_notes', $report->admin_notes),
         ]);
 
+        log_rbac("Report #{$report->id} (Resource #{$report->resource_id}) marked as Resolved", $user, [
+            'report_id' => $report->id,
+            'resource_id' => $report->resource_id,
+        ]);
+
         return redirect()
             ->route('admin.reports.index')
             ->with('success', "Report #{$report->id} marked as Resolved!");
@@ -145,6 +150,11 @@ class ReportAdminController extends Controller
             'resolved_by' => $user->id,
             'resolved_at' => now(),
             'admin_notes' => $request->input('admin_notes', $report->admin_notes),
+        ]);
+
+        log_rbac("Report #{$report->id} (Resource #{$report->resource_id}) dismissed", $user, [
+            'report_id' => $report->id,
+            'resource_id' => $report->resource_id,
         ]);
 
         return redirect()
@@ -187,60 +197,61 @@ class ReportAdminController extends Controller
                 try {
                     $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
                 }
             }
             $file->delete();
         };
 
-        // If a specific file was reported, delete only that file
-        if ($report->resource_file_id) {
-            $reportedFile = $resource->files->firstWhere('id', $report->resource_file_id);
-
-            if ($reportedFile) {
-                $fileName = $reportedFile->original_filename;
-                $deleteFileRecord($reportedFile);
-
-                // Check remaining files count on the resource
-                $remainingFilesCount = $resource->files()->count();
-                if ($remainingFilesCount === 0) {
-                    $resource->delete();
-                    $actionSummary = "Reported file '{$fileName}' was deleted. As no other files remained, resource '{$title}' was also deleted.";
-                } else {
-                    $actionSummary = "Reported file '{$fileName}' was deleted from resource '{$title}'.";
-                }
-
-                // Mark report as resolved
-                $report->update([
-                    'status' => ResourceReport::STATUS_RESOLVED,
-                    'resolved_by' => $user->id,
-                    'resolved_at' => now(),
-                    'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Faulty file '{$fileName}' deleted by {$user->first_name}",
-                ]);
-
-                return redirect()
-                    ->route('admin.reports.index')
-                    ->with('success', "{$actionSummary} Report #{$report->id} marked as Resolved!");
-            }
+        // If no specific file was linked to this report
+        if (! $report->resource_file_id) {
+            return back()->with('error', 'This report is not associated with a specific file.');
         }
 
-        // Fallback: Delete all associated files and the whole resource
-        foreach ($resource->files as $file) {
-            $deleteFileRecord($file);
+        $reportedFile = $resource->files->firstWhere('id', $report->resource_file_id);
+
+        // If the reported file was already deleted earlier
+        if (! $reportedFile) {
+            $report->update([
+                'status' => ResourceReport::STATUS_RESOLVED,
+                'resolved_by' => $user->id,
+                'resolved_at' => now(),
+                'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Reported file was already deleted.",
+            ]);
+
+            return redirect()
+                ->route('admin.reports.index')
+                ->with('success', "The reported file was already deleted. Report #{$report->id} has been marked as Resolved.");
         }
 
-        $resource->delete();
+        $fileName = $reportedFile->original_filename;
+        $deleteFileRecord($reportedFile);
+
+        // Check remaining files count on the resource
+        $remainingFilesCount = $resource->files()->count();
+        if ($remainingFilesCount === 0) {
+            $resource->delete();
+            $actionSummary = "Reported file '{$fileName}' was deleted. As no other files remained, resource '{$title}' was also deleted.";
+        } else {
+            $actionSummary = "Reported file '{$fileName}' was deleted from resource '{$title}'.";
+        }
+
+        log_rbac("File #{$reportedFile->id} ('{$fileName}') deleted via Report #{$report->id}", $user, [
+            'report_id' => $report->id,
+            'resource_id' => $resource->id,
+            'file_id' => $reportedFile->id,
+        ]);
 
         // Mark report as resolved
         $report->update([
             'status' => ResourceReport::STATUS_RESOLVED,
             'resolved_by' => $user->id,
             'resolved_at' => now(),
-            'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Faulty resource deleted by {$user->first_name}",
+            'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Faulty file '{$fileName}' deleted by {$user->first_name}",
         ]);
 
         return redirect()
             ->route('admin.reports.index')
-            ->with('success', "Reported resource '{$title}' was deleted and report #{$report->id} was marked as Resolved!");
+            ->with('success', "{$actionSummary} Report #{$report->id} marked as Resolved!");
     }
 }

@@ -53,6 +53,11 @@ class ProgramAdminController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
+        log_rbac("Degree programme #{$program->id} ('{$program->name}', {$program->degree_level}) created", $request->user(), [
+            'program_id' => $program->id,
+            'degree_level' => $program->degree_level,
+        ]);
+
         return redirect()
             ->route('admin.programs.index')
             ->with('success', "Degree programme '{$program->name}' ({$program->degree_level}) added successfully!");
@@ -100,6 +105,11 @@ class ProgramAdminController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        log_rbac("Degree programme #{$program->id} ('{$program->name}', {$program->degree_level}) updated", $request->user(), [
+            'program_id' => $program->id,
+            'degree_level' => $program->degree_level,
+        ]);
+
         return redirect()
             ->route('admin.programs.index')
             ->with('success', "Degree programme '{$program->name}' updated successfully!");
@@ -122,7 +132,12 @@ class ProgramAdminController extends Controller
 
         $name = $program->name;
         $level = $program->degree_level;
+        $programId = $program->id;
         $program->delete();
+
+        log_rbac("Degree programme #{$programId} ('{$name}', {$level}) deleted", request()->user(), [
+            'program_id' => $programId,
+        ]);
 
         return redirect()
             ->route('admin.programs.index')

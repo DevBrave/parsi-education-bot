@@ -16,18 +16,54 @@ class CourseAdminController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $courseQuery = Course::with('programs')->orderBy('name');
-        $programQuery = Program::where('is_active', true)->orderBy('name');
+        $courseQuery = Course::with(['programs', 'tracks'])
+            ->orderByRaw('year IS NULL, year ASC')
+            ->orderBy('name', 'asc');
 
+        $programQuery = Program::with('tracks')
+            ->where('is_active', true)
+            ->orderBy('degree_level', 'asc')
+            ->orderBy('name', 'asc');
         // If user is a professor, restrict courses and programs to their assigned major
         if ($user && $user->isProfessor() && $user->program_id) {
             $programId = $user->program_id;
-            
+
             $courseQuery->whereHas('programs', function ($q) use ($programId) {
                 $q->where('programs.id', $programId);
             });
 
             $programQuery->where('id', $programId);
+        }
+
+        // 1. Filter by Program (Major)
+        if ($request->filled('program_id')) {
+            $filterProgramId = (int) $request->input('program_id');
+            $courseQuery->whereHas('programs', function ($q) use ($filterProgramId) {
+                $q->where('programs.id', $filterProgramId);
+            });
+        }
+
+        // 2. Filter by Academic Year
+        if ($request->filled('year')) {
+            $courseQuery->where('year', (int) $request->input('year'));
+        }
+
+        // 3. Search Keyword (Name or Code)
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $courseQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('course_code', 'like', "%{$search}%");
+            });
+        }
+
+        // 4. Status Filter
+        if ($request->filled('status')) {
+            if ($request->input('status') === 'active') {
+                $courseQuery->where('is_active', true);
+            } elseif ($request->input('status') === 'inactive') {
+                $courseQuery->where('is_active', false);
+            }
         }
 
         $courses = $courseQuery->get();
@@ -36,6 +72,7 @@ class CourseAdminController extends Controller
         return view('admin.courses.index', [
             'courses' => $courses,
             'programs' => $programs,
+            'user' => $user,
         ]);
     }
 
@@ -55,6 +92,8 @@ class CourseAdminController extends Controller
             'year' => ['nullable', 'integer', 'min:1', 'max:6'],
             'program_ids' => ['nullable', 'array'],
             'program_ids.*' => ['exists:programs,id'],
+            'track_ids' => ['nullable', 'array'],
+            'track_ids.*' => ['exists:tracks,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -70,6 +109,16 @@ class CourseAdminController extends Controller
             $course->programs()->sync($validated['program_ids']);
         }
 
+        if (! empty($validated['track_ids'])) {
+            $course->tracks()->sync($validated['track_ids']);
+        }
+        $course->clearCourseCaches();
+
+        log_rbac("Course #{$course->id} ('{$course->name}', code: {$course->course_code}) created", $request->user(), [
+            'course_id' => $course->id,
+            'course_code' => $course->course_code,
+        ]);
+
         return redirect()
             ->route('admin.courses.index')
             ->with('success', "Course '{$course->name}' added successfully!");
@@ -78,13 +127,19 @@ class CourseAdminController extends Controller
     /**
      * Show the form for editing the specified course.
      */
-    public function edit(Course $course)
+    public function edit(Request $request, Course $course)
     {
-        $programs = Program::where('is_active', true)->orderBy('name')->get();
+        $user = $request->user();
+        $programQuery = Program::with('tracks')->where('is_active', true)->orderBy('name');
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $programQuery->where('id', $user->program_id);
+        }
+        $programs = $programQuery->get();
 
         return view('admin.courses.edit', [
-            'course' => $course->load('programs'),
+            'course' => $course->load(['programs', 'tracks']),
             'programs' => $programs,
+            'user' => $user,
         ]);
     }
 
@@ -104,6 +159,8 @@ class CourseAdminController extends Controller
             'year' => ['nullable', 'integer', 'min:1', 'max:6'],
             'program_ids' => ['nullable', 'array'],
             'program_ids.*' => ['exists:programs,id'],
+            'track_ids' => ['nullable', 'array'],
+            'track_ids.*' => ['exists:tracks,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -116,6 +173,13 @@ class CourseAdminController extends Controller
         ]);
 
         $course->programs()->sync($validated['program_ids'] ?? []);
+        $course->tracks()->sync($validated['track_ids'] ?? []);
+        $course->clearCourseCaches();
+
+        log_rbac("Course #{$course->id} ('{$course->name}', code: {$course->course_code}) updated", $request->user(), [
+            'course_id' => $course->id,
+            'course_code' => $course->course_code,
+        ]);
 
         return redirect()
             ->route('admin.courses.index')
@@ -132,8 +196,16 @@ class CourseAdminController extends Controller
         }
 
         $name = $course->name;
+        $courseId = $course->id;
+        $courseCode = $course->course_code;
+        $course->clearCourseCaches();
         $course->programs()->detach();
         $course->delete();
+
+        log_rbac("Course #{$courseId} ('{$name}', code: {$courseCode}) deleted", request()->user(), [
+            'course_id' => $courseId,
+            'course_code' => $courseCode,
+        ]);
 
         return redirect()
             ->route('admin.courses.index')

@@ -23,7 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Admin Authentication (Public)
 Route::prefix('admin')->group(function () {
     Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
-    Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.submit');
+    Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1')->name('admin.login.submit');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 });
 
@@ -39,6 +39,7 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::get('/resources/{resource}/edit', [ResourceAdminController::class, 'edit'])->name('admin.resources.edit');
     Route::put('/resources/{resource}', [ResourceAdminController::class, 'update'])->name('admin.resources.update');
     Route::get('/resources/{resource}/files/{file}/download', [ResourceAdminController::class, 'downloadFile'])->name('admin.resources.download');
+    Route::post('/resources/{resource}/sync-drive', [ResourceAdminController::class, 'syncDrive'])->name('admin.resources.sync-drive');
     Route::delete('/resources/{resource}/files/{file}', [ResourceAdminController::class, 'destroyFile'])->name('admin.resources.files.destroy');
     Route::delete('/resources/{resource}', [ResourceAdminController::class, 'destroy'])->name('admin.resources.destroy');
 
@@ -82,6 +83,13 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::post('/reports/{report}/resolve', [\App\Http\Controllers\Admin\ReportAdminController::class, 'resolve'])->name('admin.reports.resolve');
     Route::post('/reports/{report}/dismiss', [\App\Http\Controllers\Admin\ReportAdminController::class, 'dismiss'])->name('admin.reports.dismiss');
     Route::delete('/reports/{report}/resource', [\App\Http\Controllers\Admin\ReportAdminController::class, 'destroyResource'])->name('admin.reports.resource.destroy');
+
+    // 8. Live System Logs & Monitoring
+    Route::get('/logs', [\App\Http\Controllers\Admin\LogAdminController::class, 'index'])->name('admin.logs.index');
+    Route::get('/logs/poll', [\App\Http\Controllers\Admin\LogAdminController::class, 'poll'])->name('admin.logs.poll');
+    Route::get('/logs/stream', [\App\Http\Controllers\Admin\LogAdminController::class, 'stream'])->name('admin.logs.stream');
+    Route::get('/logs/download', [\App\Http\Controllers\Admin\LogAdminController::class, 'download'])->name('admin.logs.download');
+    Route::post('/logs/clear', [\App\Http\Controllers\Admin\LogAdminController::class, 'clear'])->name('admin.logs.clear');
 });
 
 if (app()->isLocal()) {

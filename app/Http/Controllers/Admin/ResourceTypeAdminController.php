@@ -42,6 +42,11 @@ class ResourceTypeAdminController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
+        log_rbac("Resource Type #{$type->id} ('{$type->display_name}', code: {$type->code}) created", $request->user(), [
+            'resource_type_id' => $type->id,
+            'code' => $type->code,
+        ]);
+
         return redirect()
             ->route('admin.resource-types.index')
             ->with('success', "Resource Type '{$type->display_name}' created successfully!");
@@ -76,6 +81,11 @@ class ResourceTypeAdminController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        log_rbac("Resource Type #{$resourceType->id} ('{$resourceType->display_name}', code: {$resourceType->code}) updated", $request->user(), [
+            'resource_type_id' => $resourceType->id,
+            'code' => $resourceType->code,
+        ]);
+
         return redirect()
             ->route('admin.resource-types.index')
             ->with('success', "Resource Type '{$resourceType->display_name}' updated successfully!");
@@ -93,7 +103,12 @@ class ResourceTypeAdminController extends Controller
         }
 
         $name = $resourceType->display_name;
+        $typeId = $resourceType->id;
         $resourceType->delete();
+
+        log_rbac("Resource Type #{$typeId} ('{$name}') deleted", request()->user(), [
+            'resource_type_id' => $typeId,
+        ]);
 
         return redirect()
             ->route('admin.resource-types.index')

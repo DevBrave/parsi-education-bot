@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Jobs\UploadResourceFileJob;
 use App\Models\AcademicYear;
 use App\Models\Course;
+use App\Models\Program;
 use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\ResourceType;
+use App\Services\FileSecurityService;
 use App\Services\GoogleDriveService;
 use App\Services\ResourceModerationService;
 use App\Services\TelegramService;
@@ -28,6 +30,7 @@ class ResourceAdminController extends Controller
         $query = Resource::with(['course.programs', 'resourceType', 'academicYear', 'files', 'submitter'])
             ->latest();
 
+        
         // 1. Search Filter
         if ($request->filled('search')) {
             $search = trim($request->input('search'));
@@ -44,6 +47,22 @@ class ResourceAdminController extends Controller
         // 2. Course Filter
         if ($request->filled('course_id')) {
             $query->where('course_id', $request->input('course_id'));
+        }
+
+        // 2b. Degree Programme (Major) Filter
+        if ($request->filled('program_id')) {
+            $programId = (int) $request->input('program_id');
+            $query->whereHas('course.programs', function ($q) use ($programId) {
+                $q->where('programs.id', $programId);
+            });
+        }
+
+        // 2c. Academic Year Filter
+        if ($request->filled('year')) {
+            $year = (int) $request->input('year');
+            $query->whereHas('course', function ($q) use ($year) {
+                $q->where('year', $year);
+            });
         }
 
         // 3. Resource Type Filter
@@ -101,11 +120,13 @@ class ResourceAdminController extends Controller
         $courses = $courseQuery->get();
         $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
         $academicYears = AcademicYear::all();
+        $programs = Program::where('is_active', true)->orderBy('degree_level', 'asc')->orderBy('name', 'asc')->get();
 
         return view('admin.resources.index', [
             'resources' => $resources,
             'stats' => $stats,
             'courses' => $courses,
+            'programs' => $programs,
             'resourceTypes' => $resourceTypes,
             'academicYears' => $academicYears,
         ]);
@@ -169,7 +190,20 @@ class ResourceAdminController extends Controller
         }
 
         $filesToUpload = [];
+        $securityService = app(FileSecurityService::class);
         foreach ($request->file('files') as $file) {
+            $security = $securityService->validateUpload(
+                $file->getClientOriginalName(),
+                $file->getClientMimeType(),
+                $file->getRealPath()
+            );
+
+            if (! $security['valid']) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
+            }
+
             $fileHash = hash_file('sha256', $file->getRealPath());
 
             // Check for duplicate file
@@ -229,6 +263,13 @@ class ResourceAdminController extends Controller
         foreach ($createdFiles as $item) {
             UploadResourceFileJob::dispatch($item['resourceFile'], $item['storedPath'], "📚 {$validated['title']}");
         }
+
+        $resourceId = $createdFiles[0]['resourceFile']->resource_id ?? null;
+        log_rbac("Resource #{$resourceId} ('{$validated['title']}') created with " . count($createdFiles) . " file(s)", $request->user(), [
+            'resource_id' => $resourceId,
+            'course_id' => $validated['course_id'],
+            'files_count' => count($createdFiles),
+        ]);
 
         return redirect()
             ->route('admin.resources.index')
@@ -309,7 +350,20 @@ class ResourceAdminController extends Controller
         $createdFiles = [];
         if (! empty($incomingFiles)) {
             $filesToUpload = [];
+            $securityService = app(FileSecurityService::class);
             foreach ($incomingFiles as $file) {
+                $security = $securityService->validateUpload(
+                    $file->getClientOriginalName(),
+                    $file->getClientMimeType(),
+                    $file->getRealPath()
+                );
+
+                if (! $security['valid']) {
+                    return back()
+                        ->withInput()
+                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
+                }
+
                 $fileHash = hash_file('sha256', $file->getRealPath());
 
                 $existingFile = ResourceFile::where('sha256', $fileHash)->first();
@@ -366,6 +420,12 @@ class ResourceAdminController extends Controller
             }
         }
 
+        log_rbac("Resource #{$resource->id} ('{$resource->title}') updated", $request->user(), [
+            'resource_id' => $resource->id,
+            'status' => $validated['status'],
+            'new_files_count' => count($createdFiles),
+        ]);
+
         $extraMsg = ! empty($createdFiles)
             ? ' and ' . count($createdFiles) . ' new file(s) attached for background syncing'
             : '';
@@ -406,18 +466,29 @@ class ResourceAdminController extends Controller
             try {
                 $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
             } catch (\Throwable $e) {
-                Log::warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
             }
         }
 
         $filename = $file->original_filename;
+        $fileId = $file->id;
         $file->delete();
+
+        log_rbac("File #{$fileId} ('{$filename}') deleted from Resource #{$resource->id}", $user, [
+            'resource_id' => $resource->id,
+            'file_id' => $fileId,
+            'filename' => $filename,
+        ]);
 
         $driveNote = (! $driveDeleted && $file->drive_file_id) ? ' (Note: Google Drive file removal failed)' : '';
 
         // If no files remain on this resource, remove the empty resource as well
         if ($resource->files()->count() === 0) {
             $resource->delete();
+
+            log_rbac("Resource #{$resource->id} ('{$resource->title}') deleted (no remaining files)", $user, [
+                'resource_id' => $resource->id,
+            ]);
 
             return redirect()
                 ->route('admin.resources.index')
@@ -452,13 +523,18 @@ class ResourceAdminController extends Controller
                 try {
                     $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
                 }
             }
             $file->delete();
         }
 
+        $resourceId = $resource->id;
         $resource->delete();
+
+        log_rbac("Resource #{$resourceId} ('{$title}') and all its files deleted", $user, [
+            'resource_id' => $resourceId,
+        ]);
 
         return redirect()
             ->route('admin.resources.index')
@@ -502,6 +578,88 @@ class ResourceAdminController extends Controller
         }
 
         return back()->with('error', 'Document file is currently not accessible for preview or download.');
+    }
+
+    /**
+     * Manually sync all unsynced files of a resource to Google Drive with one click.
+     */
+    public function syncDrive(Resource $resource, GoogleDriveService $driveService, TelegramService $telegram)
+    {
+        $user = request()->user();
+        if ($user && ! $user->canEditResource($resource)) {
+            abort(403, 'Unauthorized. You do not have permission to sync this resource.');
+        }
+
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '600');
+
+        if (! $driveService->isConfigured()) {
+            return back()->with('error', 'Google Drive service is not configured on this server.');
+        }
+
+        $courseName = $resource->course?->name ?? 'General';
+        $typeName = $resource->resourceType?->display_name ?? 'Notes';
+
+        $courseFolderId = $driveService->getOrCreateFolder($courseName);
+        $targetFolderId = $driveService->getOrCreateFolder($typeName, $courseFolderId);
+
+        $syncedCount = 0;
+        $failedCount = 0;
+
+        foreach ($resource->files as $file) {
+            if ($file->drive_file_id) {
+                continue;
+            }
+
+            $tempPath = null;
+            $sourcePath = null;
+
+            if ($file->local_path && Storage::disk('local')->exists($file->local_path)) {
+                $sourcePath = Storage::disk('local')->path($file->local_path);
+            } elseif ($file->telegram_file_id) {
+                $tgFile = $telegram->getFile($file->telegram_file_id);
+                if ($tgFile && isset($tgFile['file_path'])) {
+                    $downloadUrl = $telegram->getFileDownloadUrl($tgFile['file_path']);
+                    $response = Http::timeout(60)->get($downloadUrl);
+                    if ($response->successful()) {
+                        $tempPath = tempnam(sys_get_temp_dir(), 'parsi_sync_');
+                        file_put_contents($tempPath, $response->body());
+                        $sourcePath = $tempPath;
+                    }
+                }
+            }
+
+            if ($sourcePath && file_exists($sourcePath)) {
+                $mime = $file->mime_type ?? 'application/pdf';
+                $driveId = $driveService->uploadFile($sourcePath, $file->original_filename, $mime, $targetFolderId);
+                if ($driveId) {
+                    $file->update(['drive_file_id' => $driveId]);
+                    $syncedCount++;
+                } else {
+                    $failedCount++;
+                }
+            } else {
+                $failedCount++;
+            }
+
+            if ($tempPath && file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+        }
+
+        log_rbac("Resource #{$resource->id} ('{$resource->title}') manual Drive sync: {$syncedCount} synced, {$failedCount} failed", $user, [
+            'resource_id' => $resource->id,
+            'synced' => $syncedCount,
+            'failed' => $failedCount,
+        ]);
+
+        if ($syncedCount > 0) {
+            return back()->with('success', "{$syncedCount} file(s) successfully synced to Google Drive!");
+        } elseif ($failedCount > 0) {
+            return back()->with('error', "Could not sync {$failedCount} file(s) to Google Drive. Check drive logs for details.");
+        }
+
+        return back()->with('info', 'All files for this resource are already synced to Google Drive.');
     }
 }
 

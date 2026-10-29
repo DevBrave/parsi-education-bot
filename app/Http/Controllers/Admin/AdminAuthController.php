@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class AdminAuthController extends Controller
@@ -46,6 +47,13 @@ class AdminAuthController extends Controller
             $user = Auth::user();
 
             if (! $user->isStaff()) {
+                bot_log('auth')->warning('Admin login rejected: non-staff user tried to log in', [
+                    'user_id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role,
+                    'ip' => $request->ip(),
+                ]);
+
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
@@ -55,11 +63,23 @@ class AdminAuthController extends Controller
                     ->withErrors(['email' => 'Access denied. This account does not have administrator or staff privileges.']);
             }
 
+            bot_log('auth')->info("Admin user logged in: {$user->username} ({$user->role})", [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role,
+                'ip' => $request->ip(),
+            ]);
+
             $request->session()->regenerate();
 
             return redirect()->intended(route('admin.dashboard'))
                 ->with('success', "Welcome back, {$user->first_name}!");
         }
+
+        bot_log('auth')->warning('Failed admin login attempt: bad credentials', [
+            'login' => $loginInput,
+            'ip' => $request->ip(),
+        ]);
 
         return back()
             ->withInput($request->only('email', 'remember'))
@@ -71,6 +91,14 @@ class AdminAuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user) {
+            bot_log('auth')->info("Admin user logged out: {$user->username}", [
+                'user_id' => $user->id,
+                'ip' => $request->ip(),
+            ]);
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -10,20 +10,62 @@ use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\ResourceType;
 use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
     /**
      * Display the main admin dashboard with summaries, statistics, and graphs.
+     * Uses Split Caching: heavy aggregates are cached for 10 minutes,
+     * while operational metrics (pending count, recent uploads, current year) are queried live.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $userStats = $this->getUserStats();
-        $courseStats = $this->getCourseStats();
-        $yearStats = $this->getYearStats();
-        $resourceStats = $this->getResourceStats();
-        $chartData = $this->getChartData($userStats, $courseStats, $yearStats, $resourceStats);
+        if ($request->boolean('refresh')) {
+            Cache::forget('admin:dashboard:heavy_metrics');
+        }
+
+        $cachedMetrics = Cache::remember('admin:dashboard:heavy_metrics', now()->addMinutes(10), function () {
+            $userStats = $this->getUserStats();
+            $courseStats = $this->getCourseStats();
+            $yearStats = $this->getYearStats();
+            $resourceStats = $this->getHeavyResourceStats();
+            $chartData = $this->getChartData($userStats['languages']);
+
+            return [
+                'userStats' => $userStats,
+                'courseStats' => $courseStats,
+                'yearStats' => $yearStats,
+                'resourceStats' => $resourceStats,
+                'chartData' => $chartData,
+            ];
+        });
+
+        // Extract cached scalar metrics
+        $userStats = $cachedMetrics['userStats'];
+        $courseStats = $cachedMetrics['courseStats'];
+        $yearStats = $cachedMetrics['yearStats'];
+        $resourceStats = $cachedMetrics['resourceStats'];
+        $chartData = $cachedMetrics['chartData'];
+
+        // Inject live operational metrics (always fresh & live Eloquent models)
+        $resourceStats['pending'] = Resource::where('status', 'pending')->count();
+        $resourceStats['approved'] = Resource::where('status', 'approved')->count();
+        $resourceStats['recent'] = Resource::with(['course', 'resourceType', 'academicYear'])
+            ->latest()
+            ->take(6)
+            ->get();
+
+        $yearStats['current'] = AcademicYear::where('is_current', true)->first();
+
+        // Live top courses table (always live Eloquent models with relations, never cached as objects)
+        $courseStats['top_courses'] = Course::withCount('resources')
+        ->with('programs')
+        ->orderByDesc('resources_count')
+            ->take(6)
+            ->get();
 
         return view('admin.dashboard', [
             'userStats' => $userStats,
@@ -35,7 +77,7 @@ class AdminDashboardController extends Controller
     }
 
     /**
-     * Aggregate user metrics and language/programme distribution.
+     * Aggregate user metrics and language/programme distribution (pure scalar values).
      */
     protected function getUserStats(): array
     {
@@ -52,12 +94,6 @@ class AdminDashboardController extends Controller
             ->pluck('count', 'preferred_language')
             ->toArray();
 
-        // Top programmes by student count
-        $topPrograms = Program::withCount('users')
-            ->orderByDesc('users_count')
-            ->take(5)
-            ->get();
-
         return [
             'total' => $totalUsers,
             'new_this_week' => $newThisWeek,
@@ -65,17 +101,16 @@ class AdminDashboardController extends Controller
             'blocked' => $blockedUsers,
             'with_program' => $withProgram,
             'languages' => [
-                'en' => $languages['en'] ?? 0,
-                'it' => $languages['it'] ?? 0,
-                'fa' => $languages['fa'] ?? 0,
-                'other' => array_sum(array_diff_key($languages, ['en' => 0, 'it' => 0, 'fa' => 0])),
+                'en' => (int) ($languages['en'] ?? 0),
+                'it' => (int) ($languages['it'] ?? 0),
+                'fa' => (int) ($languages['fa'] ?? 0),
+                'other' => (int) array_sum(array_diff_key($languages, ['en' => 0, 'it' => 0, 'fa' => 0])),
             ],
-            'top_programs' => $topPrograms,
         ];
     }
 
     /**
-     * Aggregate course and degree programme statistics.
+     * Aggregate course and degree programme statistics (pure scalar values).
      */
     protected function getCourseStats(): array
     {
@@ -89,50 +124,30 @@ class AdminDashboardController extends Controller
             ->pluck('count', 'degree_level')
             ->toArray();
 
-        // Top courses by material count
-        $topCourses = Course::withCount('resources')
-            ->with('programs')
-            ->orderByDesc('resources_count')
-            ->take(6)
-            ->get();
-
         return [
             'total' => $totalCourses,
             'active' => $activeCourses,
             'total_programs' => $totalPrograms,
             'levels' => $levelCounts,
-            'top_courses' => $topCourses,
         ];
     }
 
     /**
-     * Aggregate academic years metrics.
+     * Aggregate academic years metrics (pure scalar values).
      */
     protected function getYearStats(): array
     {
-        $totalYears = AcademicYear::count();
-        $currentYear = AcademicYear::where('is_current', true)->first();
-
-        $yearsWithCount = AcademicYear::withCount('resources')
-            ->orderByDesc('label')
-            ->take(6)
-            ->get();
-
         return [
-            'total' => $totalYears,
-            'current' => $currentYear,
-            'history' => $yearsWithCount,
+            'total' => AcademicYear::count(),
         ];
     }
 
     /**
-     * Aggregate educational resources and file storage statistics.
+     * Aggregate educational resources and file storage statistics (pure scalar values).
      */
-    protected function getResourceStats(): array
+    protected function getHeavyResourceStats(): array
     {
         $totalResources = Resource::count();
-        $approvedCount = Resource::where('status', 'approved')->count();
-        $pendingCount = Resource::where('status', 'pending')->count();
         $withSolutions = Resource::where('has_solutions', true)->count();
 
         $totalDownloads = (int) Resource::sum('downloads_count');
@@ -141,67 +156,59 @@ class AdminDashboardController extends Controller
         $totalFiles = ResourceFile::count();
         $totalBytes = (int) ResourceFile::sum('size_bytes');
 
-        // Resources per type
-        $types = ResourceType::withCount('resources')
-            ->orderByDesc('resources_count')
-            ->get();
-
-        // Recent 6 uploaded resources
-        $recentResources = Resource::with(['course', 'resourceType', 'academicYear'])
-            ->latest()
-            ->take(6)
-            ->get();
-
         return [
             'total' => $totalResources,
-            'approved' => $approvedCount,
-            'pending' => $pendingCount,
             'with_solutions' => $withSolutions,
             'total_downloads' => $totalDownloads,
             'total_inline_shares' => $totalInlineShares,
             'total_files' => $totalFiles,
             'storage_bytes' => $totalBytes,
             'storage_formatted' => $this->formatBytes($totalBytes),
-            'types' => $types,
-            'recent' => $recentResources,
         ];
     }
 
     /**
-     * Prepare structured datasets for Chart.js interactive graphs.
+     * Prepare structured datasets for Chart.js interactive graphs (pure primitive arrays).
      */
-    protected function getChartData(array $userStats, array $courseStats, array $yearStats, array $resourceStats): array
+    protected function getChartData(array $languages): array
     {
         // 1. Resources by Type Chart
-        $typeLabels = [];
-        $typeData = [];
-        foreach ($resourceStats['types'] as $type) {
-            $typeLabels[] = $type->display_name;
-            $typeData[] = $type->resources_count;
-        }
+        $types = ResourceType::withCount('resources')
+            ->orderByDesc('resources_count')
+            ->get();
+
+        $typeLabels = $types->pluck('display_name')->toArray();
+        $typeData = $types->pluck('resources_count')->map(fn($v) => (int) $v)->toArray();
 
         // 2. Student Programme Distribution Chart
+        $programs = Program::withCount('users')
+            ->orderByDesc('users_count')
+            ->take(5)
+            ->get();
+
         $programLabels = [];
         $programData = [];
-        foreach ($userStats['top_programs'] as $prog) {
-            $programLabels[] = $prog->name.($prog->degree_level ? " ({$prog->degree_level})" : '');
-            $programData[] = $prog->users_count;
+        foreach ($programs as $prog) {
+            $programLabels[] = $prog->name . ($prog->degree_level ? " ({$prog->degree_level})" : '');
+            $programData[] = (int) $prog->users_count;
         }
 
         // 3. Materials by Academic Year Chart
-        $yearLabels = [];
-        $yearData = [];
-        foreach ($yearStats['history']->reverse() as $year) {
-            $yearLabels[] = $year->label;
-            $yearData[] = $year->resources_count;
-        }
+        $years = AcademicYear::withCount('resources')
+            ->orderByDesc('label')
+            ->take(6)
+            ->get()
+            ->reverse();
+
+        $yearLabels = $years->pluck('label')->toArray();
+        $yearData = $years->pluck('resources_count')->map(fn($v) => (int) $v)->toArray();
 
         // 4. Language Preferences
         $languageLabels = ['English (EN)', 'Italian (IT)', 'Persian (FA)'];
         $languageData = [
-            $userStats['languages']['en'],
-            $userStats['languages']['it'],
-            $userStats['languages']['fa'],
+            (int) ($languages['en'] ?? 0),
+            (int) ($languages['it'] ?? 0),
+            (int) ($languages['fa'] ?? 0),
         ];
 
         return [

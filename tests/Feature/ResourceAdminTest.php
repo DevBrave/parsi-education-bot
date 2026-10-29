@@ -274,7 +274,10 @@ class ResourceAdminTest extends TestCase
         \Illuminate\Support\Facades\Queue::fake();
         \Illuminate\Support\Facades\Storage::fake('local');
 
-        $uploadedFile = \Illuminate\Http\UploadedFile::fake()->create('sample_exam.pdf', 1024, 'application/pdf');
+        $uploadedFile = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+            'sample_exam.pdf',
+            "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+        );
 
         $response = $this->actingAs($this->admin)->post(route('admin.resources.store'), [
             'course_id' => $this->course->id,
@@ -324,7 +327,10 @@ class ResourceAdminTest extends TestCase
             'local_path' => null,
         ]);
 
-        $adminUploadedFile = \Illuminate\Http\UploadedFile::fake()->create('admin_supplement.pdf', 2048, 'application/pdf');
+        $adminUploadedFile = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+            'admin_supplement.pdf',
+            "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+        );
 
         $response = $this->actingAs($this->admin)->put(route('admin.resources.update', $resource), [
             'course_id' => $this->course->id,

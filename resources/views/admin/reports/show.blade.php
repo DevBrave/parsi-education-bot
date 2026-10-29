@@ -91,6 +91,7 @@
                             @if($report->resolved_at)
                                 on {{ is_string($report->resolved_at) ? \Carbon\Carbon::parse($report->resolved_at)->format('M d, Y H:i') : $report->resolved_at->format('M d, Y H:i') }}
                             @endif
+                                <p>{{ $report->admin_notes ?? '' }}</p>
                         </div>
                     </div>
                 @endif
@@ -179,15 +180,6 @@
                                                 🌐 Drive
                                             </a>
                                         @endif
-                                        @if(Auth::user()->canDeleteResource($report->resource))
-                                            <form action="{{ route('admin.resources.files.destroy', [$report->resource, $file]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete \'{{ addslashes($file->original_filename) }}\'?');" style="display: inline;">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" title="Delete this file">
-                                                    🗑️
-                                                </button>
-                                            </form>
-                                        @endif
                                     </div>
                                 </div>
                             @empty
@@ -247,20 +239,16 @@
                         </form>
                     </div>
 
-                    <!-- Danger Action: Delete Resource or Specific Reported File -->
-                    @if($report->resource && Auth::user()->canDeleteResource($report->resource))
-                        @php
-                            $targetFileName = $report->resourceFile?->original_filename;
-                        @endphp
-                        <form method="POST" action="{{ route('admin.reports.resource.destroy', $report) }}" onsubmit="return confirm('⚠️ ARE YOU SURE?\n\nThis will PERMANENTLY delete {{ $targetFileName ? 'the reported file \'' . addslashes($targetFileName) . '\'' : 'the resource \'' . addslashes($report->resource->title) . '\' with all its files' }} from storage, Telegram, and Google Drive, and mark this report as Resolved.');">
+                    <!-- Danger Action: Delete Specific Reported File -->
+                    @php
+                        $targetFileName = $report->resourceFile?->original_filename;
+                    @endphp
+                    @if($report->resource && $targetFileName && Auth::user()->canDeleteResource($report->resource))
+                        <form method="POST" action="{{ route('admin.reports.resource.destroy', $report) }}" onsubmit="return confirm('⚠️ ARE YOU SURE?\n\nThis will PERMANENTLY delete the reported file \'{{ addslashes($targetFileName) }}\' from local storage, Telegram, and Google Drive, and mark this report as Resolved.');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-danger" style="padding: 0.65rem 1.25rem; background: #ef4444; color: white;">
-                                @if($targetFileName)
-                                    🗑️ Delete Reported File ({{ \Illuminate\Support\Str::limit($targetFileName, 25) }})
-                                @else
-                                    🗑️ Delete Faulty Resource
-                                @endif
+                                🗑️ Delete Reported File ({{ \Illuminate\Support\Str::limit($targetFileName, 25) }})
                             </button>
                         </form>
                     @endif

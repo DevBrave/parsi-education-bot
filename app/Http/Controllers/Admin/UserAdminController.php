@@ -124,7 +124,15 @@ class UserAdminController extends Controller
             $updateData['password'] = Hash::make($validated['password']);
         }
 
+        $oldRole = $user->role;
         $user->update($updateData);
+
+        log_rbac("User #{$user->id} ('{$user->first_name} {$user->last_name}') updated (role: {$oldRole} -> {$user->role})", $request->user(), [
+            'target_user_id' => $user->id,
+            'old_role' => $oldRole,
+            'new_role' => $user->role,
+            'program_id' => $user->program_id,
+        ]);
 
         return redirect()
             ->route('admin.users.index')

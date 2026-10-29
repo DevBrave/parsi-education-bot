@@ -81,6 +81,13 @@
                     </a>
                 </li>
             @endif
+            @if(Auth::check() && Auth::user()->canViewLogs())
+                <li>
+                    <a href="{{ route('admin.logs.index') }}" class="nav-link {{ request()->routeIs('admin.logs.*') ? 'active' : '' }}">
+                        📡 Live Logs
+                    </a>
+                </li>
+            @endif
             @if(Auth::check())
                 <li style="margin-left: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 0.775rem; font-weight: 600; color: var(--text-main); background: var(--bg); padding: 0.35rem 0.65rem; border-radius: 6px; border: 1px solid var(--border);" title="Role: {{ Auth::user()->role_label }}">

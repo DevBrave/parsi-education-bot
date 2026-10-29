@@ -190,9 +190,14 @@
                     <span>⭐ Current Academic Year:</span>
                     <strong>{{ $yearStats['current'] ? $yearStats['current']->label : 'Not Assigned' }}</strong>
                 </div>
-                <h1 class="dash-title">
-                    PARSI Dashboard
-                </h1>
+                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <h1 class="dash-title">
+                        PARSI Dashboard
+                    </h1>
+                    <a href="{{ route('admin.dashboard', ['refresh' => 1]) }}" title="Refresh cached statistics" style="font-size: 0.8rem; background: rgba(255, 255, 255, 0.15); color: #fff; text-decoration: none; padding: 0.35rem 0.75rem; border-radius: 9999px; backdrop-filter: blur(4px); display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.2s;">
+                        <span>🔄</span> Refresh Stats
+                    </a>
+                </div>
             </div>
         </div>
 

@@ -159,15 +159,15 @@
                             <td>
                                 @if($report->status === 'pending')
                                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">
-                                        ⏳ Pending
+                                         Pending
                                     </span>
                                 @elseif($report->status === 'resolved')
                                     <span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">
-                                        ✅ Resolved
+                                         Resolved
                                     </span>
                                 @else
                                     <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">
-                                        🚫 Dismissed
+                                         Dismissed
                                     </span>
                                 @endif
                             </td>

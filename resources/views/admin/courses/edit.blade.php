@@ -37,12 +37,17 @@
 
                 <div class="form-group">
                     <label for="year">Academic Year *</label>
+                    @php
+                        $availableYears = ($user && $user->program) 
+                            ? $user->program->defaultYears() 
+                            : [1, 2, 3];
+                    @endphp
                     <select id="year" name="year" required>
-                        <option value="1" {{ old('year', $course->year) == 1 ? 'selected' : '' }}>1st Year</option>
-                        <option value="2" {{ old('year', $course->year) == 2 ? 'selected' : '' }}>2nd Year</option>
-                        <option value="3" {{ old('year', $course->year) == 3 ? 'selected' : '' }}>3rd Year</option>
-                        <option value="4" {{ old('year', $course->year) == 4 ? 'selected' : '' }}>4th Year</option>
-                        <option value="5" {{ old('year', $course->year) == 5 ? 'selected' : '' }}>5th Year</option>
+                        @foreach($availableYears as $y)
+                            <option value="{{ $y }}" {{ old('year', $course->year) == $y ? 'selected' : '' }}>
+                                {{ $y }}{{ $y == 1 ? 'st' : ($y == 2 ? 'nd' : 'rd') }} Year
+                            </option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -59,6 +64,25 @@
                             </label>
                         @endforeach
                     </div>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Specialization Tracks / گرایش‌ها (Leave empty if core course for all)</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.35rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; max-height: 180px; overflow-y: auto;">
+                        @php
+                            $selectedTrackIds = old('track_ids', $course->tracks->pluck('id')->toArray());
+                            $allTracks = $programs->flatMap->tracks->unique('id');
+                        @endphp
+                        @forelse($allTracks as $track)
+                            <label style="font-weight: normal; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.35rem; background: #faf5ff; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #e9d5ff; cursor: pointer;">
+                                <input type="checkbox" name="track_ids[]" value="{{ $track->id }}" {{ in_array($track->id, $selectedTrackIds) ? 'checked' : '' }}>
+                                🎯 {{ $track->name }} ({{ $track->code ?? $track->program?->name }})
+                            </label>
+                        @empty
+                            <span style="color: var(--text-muted); font-size: 0.8125rem; padding: 0.25rem;">No specialization tracks defined yet.</span>
+                        @endforelse
+                    </div>
+                    <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.25rem;">Courses with no tracks selected will be treated as common core courses and visible to all students in the degree.</small>
                 </div>
 
                 <div class="form-group">

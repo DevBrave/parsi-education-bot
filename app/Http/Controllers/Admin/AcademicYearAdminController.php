@@ -41,10 +41,15 @@ class AcademicYearAdminController extends Controller
             AcademicYear::query()->update(['is_current' => false]);
         }
 
-        AcademicYear::create([
+        $academicYear = AcademicYear::create([
             'label' => $validated['label'],
             'starts_on' => $validated['starts_on'],
             'ends_on' => $validated['ends_on'],
+            'is_current' => $isCurrent,
+        ]);
+
+        log_rbac("Academic Year #{$academicYear->id} ('{$academicYear->label}') created", $request->user(), [
+            'academic_year_id' => $academicYear->id,
             'is_current' => $isCurrent,
         ]);
 
@@ -88,6 +93,11 @@ class AcademicYearAdminController extends Controller
             'is_current' => $isCurrent,
         ]);
 
+        log_rbac("Academic Year #{$academicYear->id} ('{$academicYear->label}') updated", $request->user(), [
+            'academic_year_id' => $academicYear->id,
+            'is_current' => $isCurrent,
+        ]);
+
         return redirect()
             ->route('admin.academic-years.index')
             ->with('success', "Academic Year '{$academicYear->label}' updated successfully!");
@@ -100,6 +110,10 @@ class AcademicYearAdminController extends Controller
     {
         AcademicYear::query()->update(['is_current' => false]);
         $academicYear->update(['is_current' => true]);
+
+        log_rbac("Academic Year #{$academicYear->id} ('{$academicYear->label}') set as current", request()->user(), [
+            'academic_year_id' => $academicYear->id,
+        ]);
 
         return redirect()
             ->route('admin.academic-years.index')
@@ -118,7 +132,12 @@ class AcademicYearAdminController extends Controller
         }
 
         $label = $academicYear->label;
+        $yearId = $academicYear->id;
         $academicYear->delete();
+
+        log_rbac("Academic Year #{$yearId} ('{$label}') deleted", request()->user(), [
+            'academic_year_id' => $yearId,
+        ]);
 
         return redirect()
             ->route('admin.academic-years.index')

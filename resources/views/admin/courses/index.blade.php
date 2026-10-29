@@ -34,12 +34,17 @@
 
                 <div class="form-group">
                     <label for="year">Academic Year *</label>
+                    @php
+                        $availableYears = ($user && $user->program) 
+                            ? $user->program->defaultYears() 
+                            : [1, 2, 3];
+                    @endphp
                     <select id="year" name="year" required>
-                        <option value="1" {{ old('year', '1') == '1' ? 'selected' : '' }}>1st Year</option>
-                        <option value="2" {{ old('year') == '2' ? 'selected' : '' }}>2nd Year</option>
-                        <option value="3" {{ old('year') == '3' ? 'selected' : '' }}>3rd Year</option>
-                        <option value="4" {{ old('year') == '4' ? 'selected' : '' }}>4th Year</option>
-                        <option value="5" {{ old('year') == '5' ? 'selected' : '' }}>5th Year</option>
+                        @foreach($availableYears as $y)
+                            <option value="{{ $y }}" {{ old('year', '1') == $y ? 'selected' : '' }}>
+                                {{ $y }}{{ $y == 1 ? 'st' : ($y == 2 ? 'nd' : 'rd') }} Year
+                            </option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -53,6 +58,24 @@
                             </label>
                         @endforeach
                     </div>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Specialization Tracks / گرایش‌ها (Leave empty if core course for all)</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.35rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; max-height: 140px; overflow-y: auto;">
+                        @php
+                            $allTracks = $programs->flatMap->tracks->unique('id');
+                        @endphp
+                        @forelse($allTracks as $track)
+                            <label style="font-weight: normal; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.35rem; background: #faf5ff; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #e9d5ff; cursor: pointer;">
+                                <input type="checkbox" name="track_ids[]" value="{{ $track->id }}" {{ in_array($track->id, old('track_ids', [])) ? 'checked' : '' }}>
+                                🎯 {{ $track->name }} ({{ $track->code ?? $track->program?->name }})
+                            </label>
+                        @empty
+                            <span style="color: var(--text-muted); font-size: 0.8125rem; padding: 0.25rem;">No specialization tracks defined yet.</span>
+                        @endforelse
+                    </div>
+                    <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.25rem;">Courses with no tracks selected will be treated as common core courses and visible to all students in the degree.</small>
                 </div>
 
                 <div class="form-group">
@@ -71,11 +94,61 @@
 
     <!-- Courses List Card -->
     <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center;">
             <div>
                 <h2>📖 Courses List ({{ $courses->count() }})</h2>
                 <p>All active and registered courses available in the bot</p>
             </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div style="padding: 1rem 1.5rem; background: #fafbfc; border-bottom: 1px solid var(--border);">
+            <form method="GET" action="{{ route('admin.courses.index') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter_search" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Search</label>
+                    <input type="text" id="filter_search" name="search" placeholder="Course name or code..." value="{{ request('search') }}">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter_program" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Degree Programme (Major)</label>
+                    <select id="filter_program" name="program_id">
+                        <option value="">All Programmes</option>
+                        @foreach($programs as $p)
+                            <option value="{{ $p->id }}" {{ request('program_id') == $p->id ? 'selected' : '' }}>
+                                {{ $p->name }} ({{ $p->degree_level ?? 'MSc' }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter_year" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Academic Year</label>
+                    <select id="filter_year" name="year">
+                        <option value="">All Years</option>
+                        @for($y = 1; $y <= 5; $y++)
+                            <option value="{{ $y }}" {{ request('year') == (string) $y ? 'selected' : '' }}>
+                                {{ $y }}{{ $y == 1 ? 'st' : ($y == 2 ? 'nd' : ($y == 3 ? 'rd' : 'th')) }} Year
+                            </option>
+                        @endfor
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter_status" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Status</label>
+                    <select id="filter_status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Filter</button>
+                    @if(request()->anyFilled(['search', 'program_id', 'year', 'status']))
+                        <a href="{{ route('admin.courses.index') }}" class="btn btn-secondary">Reset</a>
+                    @endif
+                </div>
+            </form>
         </div>
 
         <div class="table-responsive">
@@ -101,10 +174,10 @@
                                 <strong>{{ $course->name }}</strong>
                             </td>
                             <td>
-                                <span class="badge badge-info">{{ $course->year_label }}</span>
+                                <span class="badge badge-info">{{ $course->year }}</span>
                             </td>
                             <td>
-                                {{ $course->credits ? $course->credits . ' CFU' : '—' }}
+                                {{ $course->credits ? $course->credits  : '—' }}
                             </td>
                             <td>
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
@@ -114,6 +187,13 @@
                                         <span style="color: var(--text-muted); font-size: 0.75rem;">None</span>
                                     @endforelse
                                 </div>
+                                @if($course->tracks->isNotEmpty())
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.35rem;">
+                                        @foreach($course->tracks as $track)
+                                            <span class="badge" style="background: rgba(147, 51, 234, 0.12); color: #7e22ce; border: 1px solid rgba(147, 51, 234, 0.25); font-size: 0.7rem;">🎯 {{ $track->code ?? $track->name }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </td>
                             <td>
                                 @if($course->is_active)
