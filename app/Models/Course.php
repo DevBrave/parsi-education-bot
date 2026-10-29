@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 #[Fillable([
     'name',
@@ -16,9 +17,48 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Course extends Model
 {
+    protected static function booted(): void
+    {
+        static::saved(function (Course $course) {
+            $course->clearCourseCaches();
+        });
+
+        static::deleted(function (Course $course) {
+            $course->clearCourseCaches();
+        });
+    }
+
+    /**
+     * Invalidate cached catalog entries for all programs associated with this course.
+     */
+    public function clearCourseCaches(): void
+    {
+        $programs = $this->programs()->with('tracks')->get();
+        foreach ($programs as $program) {
+            Cache::forget("catalog:years:program_{$program->id}");
+            Cache::forget("catalog:courses:program_{$program->id}:year_all");
+            Cache::forget("catalog:courses:program_{$program->id}:track_all:year_all");
+            for ($y = 1; $y <= 5; $y++) {
+                Cache::forget("catalog:courses:program_{$program->id}:year_{$y}");
+                Cache::forget("catalog:courses:program_{$program->id}:track_all:year_{$y}");
+            }
+            foreach ($program->tracks as $t) {
+                Cache::forget("catalog:courses:program_{$program->id}:track_{$t->id}:year_all");
+                for ($y = 1; $y <= 5; $y++) {
+                    Cache::forget("catalog:courses:program_{$program->id}:track_{$t->id}:year_{$y}");
+                }
+            }
+        }
+    }
+
     public function programs(): BelongsToMany
     {
         return $this->belongsToMany(Program::class);
+    }
+
+    public function tracks(): BelongsToMany
+    {
+        return $this->belongsToMany(Track::class);
     }
 
     public function resources(): HasMany

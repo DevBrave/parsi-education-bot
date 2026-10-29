@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * @property int $id
@@ -33,6 +34,7 @@ use Illuminate\Support\Carbon;
     'last_name',
     'preferred_language',
     'program_id',
+    'track_id',
     'role',
 ])]
 class User extends Authenticatable
@@ -58,9 +60,27 @@ class User extends Authenticatable
         return [
             'telegram_user_id' => 'integer',
             'program_id' => 'integer',
+            'track_id' => 'integer',
             'is_blocked' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (User $user) {
+            if ($user->telegram_user_id) {
+                Cache::forget("user_id:telegram_{$user->telegram_user_id}");
+                Cache::forget("user:telegram_{$user->telegram_user_id}");
+            }
+        });
+
+        static::deleted(function (User $user) {
+            if ($user->telegram_user_id) {
+                Cache::forget("user_id:telegram_{$user->telegram_user_id}");
+                Cache::forget("user:telegram_{$user->telegram_user_id}");
+            }
+        });
     }
 
     public const ROLE_ADMIN = 'admin';
@@ -70,10 +90,16 @@ class User extends Authenticatable
     public const ROLE_EDITOR = 'editor';
     public const ROLE_VIEWER = 'viewer';
     public const ROLE_STUDENT = 'student';
+    public const ROLE_VIP = "vip"; // TODO : ADD nishit and ilia as vip
 
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function track(): BelongsTo
+    {
+        return $this->belongsTo(Track::class);
     }
 
     public function submittedResources(): HasMany
@@ -149,12 +175,17 @@ class User extends Authenticatable
 
     public function canManageCatalog(): bool
     {
-        return $this->isAdmin() || $this->isEditor() || $this->isModerator();
+        return $this->isAdmin() || $this->isEditor() || $this->isModerator(); 
     }
 
     public function canViewReports(): bool
     {
         return $this->isStaff();
+    }
+
+    public function canViewLogs(): bool
+    {
+        return $this->isAdmin() || $this->isModerator();
     }
 
     public function canManageReport(ResourceReport $report): bool

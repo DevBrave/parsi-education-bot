@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 #[Fillable([
     'course_id',
@@ -26,6 +27,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Resource extends Model
 {
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        $flushSearchCaches = function () {
+            Cache::forget('search:inline:en:default_latest');
+            Cache::forget('search:inline:fa:default_latest');
+            Cache::forget('search:inline:it:default_latest');
+            Cache::forget('admin:dashboard:heavy_metrics');
+        };
+
+        static::saved($flushSearchCaches);
+        static::deleted($flushSearchCaches);
+    }
+
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
