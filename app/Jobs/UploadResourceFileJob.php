@@ -18,9 +18,9 @@ class UploadResourceFileJob implements ShouldQueue
 
     /**
      * The number of seconds the job can run before timing out.
-     * 10 minutes for large file uploads to Telegram and Google Drive.
+     * 30 minutes for large file uploads to Telegram and Google Drive.
      */
-    public int $timeout = 600;
+    public int $timeout = 1800;
 
     /**
      * Create a new job instance.
