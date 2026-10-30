@@ -109,7 +109,7 @@ class Resource extends Model
             $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
             $caption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
         }
-        $caption = __('bot.resources.caption_header', [
+        $caption .= __('bot.resources.caption_header', [
             'course' => $courseName,
             'title' => $displayTitle,
         ], $lang);
