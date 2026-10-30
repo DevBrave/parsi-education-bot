@@ -156,7 +156,7 @@ return [
         'not_available' => 'Questo materiale non è più disponibile.',
         'no_files' => 'Nessun file scaricabile al momento disponibile per questa risorsa.',
         'caption_header' => "📚 <b>:course</b>\n"
-            . "📄 :title\n"
+            . "📄 :title\n\n"
             . ":description"
             . '✅ <b>Verificato da PARSI</b>',
         'caption_contributor' => "\n⭐ Contributo di: :contributor",

@@ -161,7 +161,7 @@ return [
         'not_available' => 'This resource is no longer available.',
         'no_files' => 'No downloadable files are available for this resource yet.',
         'caption_header' => "📚 <b>:course</b>\n"
-            . "📄 :title\n"
+            . "📄 :title\n\n"
             . ":description"
             . '✅ <b>Verified by PARSI</b>',
         'caption_contributor' => "\n⭐ Contributed by: :contributor",

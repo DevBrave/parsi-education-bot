@@ -156,7 +156,7 @@ return [
         'not_available' => 'این فایل دیگر در دسترس نیست.',
         'no_files' => 'هنوز فایل قابل دانلودی برای این منبع وجود ندارد.',
         'caption_header' => "📚 <b>:course</b>\n"
-            . "📄 :title\n"
+            . "📄 :title\n\n"
             . ":description"
             . '✅ <b>تأیید شده توسط پارسی (PARSI)</b>',
         'caption_contributor' => "\n⭐ ارسال شده توسط: :contributor",

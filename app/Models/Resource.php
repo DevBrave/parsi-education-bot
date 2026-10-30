@@ -110,7 +110,7 @@ class Resource extends Model
         if ($hasDescription) {
             $rawDesc = trim($this->description);
             $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
-            $descBlock = "📝 <i>{$cleanDesc}</i>\n\n";
+            $descBlock = "📝 Description: <b>$cleanDesc</b>\n\n\n";
         }
 
         $caption = __('bot.resources.caption_header', [
