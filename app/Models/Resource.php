@@ -103,18 +103,31 @@ class Resource extends Model
         $courseName = $this->course?->name ? e($this->course->name) : 'Course Material';
         $displayTitle = e($this->title) . ($titleSuffix ? " {$titleSuffix}" : '');
 
-        $resourceDesc = null;
-        if (! empty($this->description)) {
+        $hasDescription = ! empty(trim($this->description ?? ''));
+        $cleanDesc = '';
+        $descBlock = "\n";
+
+        if ($hasDescription) {
             $rawDesc = trim($this->description);
             $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
-            $resourceDesc = "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
-            
+            $descBlock = "📝 <i>{$cleanDesc}</i>\n\n";
         }
+
         $caption = __('bot.resources.caption_header', [
             'course' => $courseName,
-            'description' => $resourceDesc,
             'title' => $displayTitle,
+            'description' => $descBlock,
         ], $lang);
+
+        // If translation had empty "📝 <b></b>", clean it up
+        if (! $hasDescription) {
+            $caption = preg_replace('/📝\s*<b>\s*<\/b>\s*/u', '', $caption);
+        }
+
+        // Fallback: If translation didn't have the :description placeholder at all, append it
+        if ($hasDescription && ! str_contains($caption, $cleanDesc)) {
+            $caption .= "\n" . trim($descBlock);
+        }
         
         if ($middleSection !== null && $middleSection !== '') {
             $caption .= "\n\n" . trim($middleSection);

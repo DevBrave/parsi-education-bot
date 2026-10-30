@@ -35,8 +35,8 @@ class ResourceCaptionTest extends TestCase
 
         $this->assertStringContainsString('Physics I', $caption);
         $this->assertStringContainsString('Midterm Review', $caption);
-        $this->assertStringContainsString('📝 <b>Description:</b>', $caption);
         $this->assertStringContainsString('Important formulas and cheat sheet for Chapters 1-5.', $caption);
+        $this->assertStringContainsString('📝 <i>', $caption);
     }
 
     public function test_build_telegram_caption_with_suffix_and_middle_section(): void
@@ -54,3 +54,4 @@ class ResourceCaptionTest extends TestCase
         $this->assertStringContainsString('📥 Custom Section', $caption);
     }
 }
+
