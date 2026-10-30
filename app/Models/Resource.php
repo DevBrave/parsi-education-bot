@@ -103,14 +103,16 @@ class Resource extends Model
         $courseName = $this->course?->name ? e($this->course->name) : 'Course Material';
         $displayTitle = e($this->title) . ($titleSuffix ? " {$titleSuffix}" : '');
 
-        $caption = null;
+        $resourceDesc = null;
         if (! empty($this->description)) {
             $rawDesc = trim($this->description);
             $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
-            $caption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
+            $resourceDesc = "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
+            
         }
-        $caption .= __('bot.resources.caption_header', [
+        $caption = __('bot.resources.caption_header', [
             'course' => $courseName,
+            'description' => $resourceDesc,
             'title' => $displayTitle,
         ], $lang);
         
