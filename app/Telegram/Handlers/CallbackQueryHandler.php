@@ -784,16 +784,18 @@ class CallbackQueryHandler
         $contributor = $resource->submitter?->username
             ? '@' . e($resource->submitter->username)
             : ($resource->submitter?->first_name ? e($resource->submitter->first_name) : null);
-        $baseCaption = __('bot.resources.caption_header', [
-            'course' => $courseName,
-            'title' => $title,
-        ], $lang);
-
+        
+        $baseCaption = null;
         if (! empty($resource->description)) {
             $rawDesc = trim($resource->description);
             $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
             $baseCaption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
         }
+
+        $baseCaption = __('bot.resources.caption_header', [
+            'course' => $courseName,
+            'title' => $title,
+        ], $lang);
         // Contributor display is currently disabled
         // if ($contributor) {
         //     $baseCaption .= __('bot.resources.caption_contributor', ['contributor' => $contributor], $lang);
