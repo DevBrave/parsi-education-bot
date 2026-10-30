@@ -288,7 +288,7 @@
                     <div class="icon" style="font-size: 1.75rem; margin-bottom: 0.35rem;">📁</div>
                     <div class="title" id="file-label" style="font-size: 0.9rem; font-weight: 600; color: var(--text-main);">Click or Drag & Drop File(s) Here to Attach</div>
                     <div class="sub" style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.25rem;">
-                        Supports PDF, ZIP, DOCX, PPTX (up to 100MB per file). Newly added files will automatically sync to Telegram and Google Drive.
+                        Supports PDF, ZIP, DOCX, PPTX (up to 500MB per file). Newly added files will automatically sync to Telegram and Google Drive.
                     </div>
                 </div>
                 @error('files') <span class="error-msg">{{ $message }}</span> @enderror

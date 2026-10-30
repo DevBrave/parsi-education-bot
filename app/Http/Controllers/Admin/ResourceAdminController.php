@@ -179,7 +179,7 @@ class ResourceAdminController extends Controller
             'language' => ['nullable', 'string', 'in:en,it,fa'],
             'status' => ['required', 'string', 'in:approved,pending,rejected'],
             'files' => ['required', 'array', 'min:1'],
-            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:102400'], // max 100MB per file
+            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:512000'], // max 500MB per file
         ]);
 
         if ($user && $user->isProfessor() && $user->program_id) {
@@ -322,8 +322,8 @@ class ResourceAdminController extends Controller
             'language' => ['nullable', 'string', 'in:en,it,fa'],
             'status' => ['required', 'string', 'in:approved,pending,rejected'],
             'files' => ['nullable', 'array'],
-            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:102400'], // max 100MB per file
-            'file' => ['nullable', 'file', 'mimes:pdf,zip,docx,pptx', 'max:102400'],
+            'files.*' => ['file', 'mimes:pdf,zip,docx,pptx', 'max:512000'], // max 500MB per file
+            'file' => ['nullable', 'file', 'mimes:pdf,zip,docx,pptx', 'max:512000'],
         ]);
 
         $resource->update([
