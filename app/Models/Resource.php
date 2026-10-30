@@ -39,7 +39,7 @@ class Resource extends Model
             Cache::forget('admin:dashboard:heavy_metrics');
         };
 
-        static::saved($flushSearchCaches);
+    
         static::deleted($flushSearchCaches);
     }
 
@@ -92,5 +92,40 @@ class Resource extends Model
     public function isOfficial(): bool
     {
         return ! $this->isCommunitySubmission();
+    }
+
+    /**
+     * Build the standard Telegram caption for this resource, including course, title,
+     * optional description, verified badge, extra content (e.g. download links), and official social media footer.
+     */
+    public function buildTelegramCaption(string $lang = 'en', ?string $titleSuffix = null, ?string $middleSection = null): string
+    {
+        $courseName = $this->course?->name ? e($this->course->name) : 'Course Material';
+        $displayTitle = e($this->title) . ($titleSuffix ? " {$titleSuffix}" : '');
+
+        $caption = __('bot.resources.caption_header', [
+            'course' => $courseName,
+            'title' => $displayTitle,
+        ], $lang);
+
+        if (! empty($this->description)) {
+            $rawDesc = trim($this->description);
+            $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
+            $caption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
+        }
+
+        if ($middleSection !== null && $middleSection !== '') {
+            $caption .= "\n\n" . trim($middleSection);
+        }
+
+        $channel = config('telegram.channel_username', 'PARSI_POLITO');
+        $bot = config('telegram.bot_username', 'parsi_politobot');
+
+        $caption .= __('bot.resources.caption_social_media', [
+            'channel' => ltrim($channel, '@'),
+            'bot' => ltrim($bot, '@'),
+        ], $lang);
+
+        return $caption;
     }
 }

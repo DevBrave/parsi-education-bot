@@ -112,16 +112,12 @@ class InlineQueryHandler
                 $allFiles = $resource->files;
                 $fileCount = $allFiles->count();
 
-                // Build official PARSI caption
-                $caption = __('bot.resources.caption_header', [
-                    'course' => $courseName,
-                    'title' => e($resource->title),
-                ], $lang);
+                // Build official PARSI caption using the unified Resource method
+                $caption = $resource->buildTelegramCaption($lang);
 
-                $caption .= __('bot.resources.caption_social_media', [
-                    'channel' => ltrim($channel, '@'),
-                    'bot' => $botUsername,
-                ], $lang);
+                $descSnippet = ! empty($resource->description)
+                    ? mb_strimwidth(trim(strip_tags($resource->description)), 0, 50, '...') . ' • '
+                    : '';
 
                 $getAllUrl = "https://t.me/{$botUsername}?start=res_{$resource->id}";
                 $courseUrl = $resource->course_id ? "https://t.me/{$botUsername}?start=course_{$resource->course_id}" : null;
@@ -157,7 +153,7 @@ class InlineQueryHandler
                             'photo_file_id' => $file->telegram_file_id,
                             'caption' => $caption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$courseName} • {$typeName} (1 photo)",
+                            'description' => "{$descSnippet}{$courseName} • {$typeName} (1 photo)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     } else {
@@ -169,7 +165,7 @@ class InlineQueryHandler
                             'mime_type' => $file->mime_type ?: 'application/pdf',
                             'caption' => $caption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$courseName} • {$typeName} (1 file)",
+                            'description' => "{$descSnippet}{$courseName} • {$typeName} (1 file)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     }
@@ -179,15 +175,7 @@ class InlineQueryHandler
                 } elseif ($hasMissingDrive && $allFiles->contains(fn($f) => filled($f->telegram_file_id))) {
                     $primaryFile = $allFiles->firstWhere(fn($f) => filled($f->telegram_file_id));
 
-                    $partCaption = __('bot.resources.caption_header', [
-                        'course' => $courseName,
-                        'title' => e($resource->title) . " (1/{$fileCount})",
-                    ], $lang);
-
-                    $partCaption .= __('bot.resources.caption_social_media', [
-                        'channel' => ltrim($channel, '@'),
-                        'bot' => $botUsername,
-                    ], $lang);
+                    $partCaption = $resource->buildTelegramCaption($lang, "(1/{$fileCount})");
 
                     $keyboard = [
                         [
@@ -213,7 +201,7 @@ class InlineQueryHandler
                             'photo_file_id' => $primaryFile->telegram_file_id,
                             'caption' => $partCaption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$courseName} • {$typeName} ({$fileCount} files)",
+                            'description' => "{$descSnippet}{$courseName} • {$typeName} ({$fileCount} files)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     } else {
@@ -225,7 +213,7 @@ class InlineQueryHandler
                             'mime_type' => $primaryFile->mime_type ?: 'application/pdf',
                             'caption' => $partCaption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$courseName} • {$typeName} ({$fileCount} files)",
+                            'description' => "{$descSnippet}{$courseName} • {$typeName} ({$fileCount} files)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     }
@@ -251,18 +239,10 @@ class InlineQueryHandler
                     }
 
                     $downloadSection = $linksText !== ''
-                        ? "📥 <b>Download Links:</b>\n\n" . $linksText . "\n"
-                        : '';
+                        ? "📥 <b>Download Links:</b>\n\n" . $linksText
+                        : null;
 
-                    $messageText = __('bot.resources.caption_header', [
-                        'course' => $courseName,
-                        'title' => e($resource->title),
-                    ], $lang) . "\n\n" .
-                    $downloadSection .
-                    __('bot.resources.caption_social_media', [
-                        'channel' => ltrim($channel, '@'),
-                        'bot' => $botUsername,
-                    ], $lang);
+                    $messageText = $resource->buildTelegramCaption($lang, null, $downloadSection);
 
                     $keyboard = [
                         [
@@ -284,7 +264,7 @@ class InlineQueryHandler
                         'type' => 'article',
                         'id' => 'res_' . $resource->id,
                         'title' => "📁 {$resource->title}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
-                        'description' => "{$courseName} • {$typeName}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
+                        'description' => "{$descSnippet}{$courseName} • {$typeName}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
                         'input_message_content' => [
                             'message_text' => $messageText,
                             'parse_mode' => 'HTML',

@@ -778,37 +778,7 @@ class CallbackQueryHandler
             return;
         }
 
-        $courseName = $resource->course?->name ? e($resource->course->name) : 'Course Material';
-        $title = e($resource->title);
-        
-        $contributor = $resource->submitter?->username
-            ? '@' . e($resource->submitter->username)
-            : ($resource->submitter?->first_name ? e($resource->submitter->first_name) : null);
-        
-        $baseCaption = null;
-        if (! empty($resource->description)) {
-            $rawDesc = trim($resource->description);
-            $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
-            $baseCaption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
-        }
-
-        $baseCaption = __('bot.resources.caption_header', [
-            'course' => $courseName,
-            'title' => $title,
-        ], $lang);
-        // Contributor display is currently disabled
-        // if ($contributor) {
-        //     $baseCaption .= __('bot.resources.caption_contributor', ['contributor' => $contributor], $lang);
-        // }
-
-        $channel = config('telegram.channel_username', 'PARSI_POLITO');
-        $bot = config('telegram.bot_username', 'parsi_politobot');
-
-        $socialFooter = __('bot.resources.caption_social_media', [
-            'channel' => ltrim($channel, '@'),
-            'bot' => ltrim($bot, '@'),
-        ], $lang);
-
+        $fileCaption = $resource->buildTelegramCaption($lang);
         $programId = $user->program_id ?? $resource->course?->programs?->first()?->id ?? 0;
 
         // 1. Try sending via Telegram if telegram_file_id exists
@@ -816,10 +786,6 @@ class CallbackQueryHandler
         $failedTgFiles = collect();
 
         foreach ($tgFiles as $file) {
-            $fileCaption = $baseCaption;
-
-            $fileCaption .= $socialFooter;
-
             $fileMarkup = [
                 'inline_keyboard' => [],
             ];
