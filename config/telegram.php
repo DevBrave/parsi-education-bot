@@ -14,7 +14,9 @@ return [
 
     'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET', ''),
 
-    'api_url' => 'https://api.telegram.org/bot',
+    'api_url' => env('TELEGRAM_API_URL', 'https://api.telegram.org/bot'),
+
+    'max_upload_size_mb' => (int) env('TELEGRAM_MAX_UPLOAD_SIZE_MB', 50),
 
     'channel_username' => env('TELEGRAM_CHANNEL_USERNAME', 'PARSI_POLITO'),
 

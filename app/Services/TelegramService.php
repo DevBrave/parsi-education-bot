@@ -256,8 +256,8 @@ class TelegramService
         }
 
         try {
-            // 360-second timeout for large files (up to 50MB) over international networks
-            $response = $this->client(360, 20)
+            // 1200-second timeout for large files (up to 2000MB) over networks or local bot api
+            $response = $this->client(1200, 30)
                 ->attach('document', $stream, $filename)
                 ->post("{$this->baseUrl}/sendDocument", $payload);
 

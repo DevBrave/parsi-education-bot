@@ -64,9 +64,11 @@ class ResourceUploadService
             $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
             $tgResult = null;
 
-            // Telegram Bot API has a 50MB (52,428,800 bytes) hard limit for bot uploads.
-            // If the file exceeds 49.5MB, skip Telegram upload and route directly to Google Drive.
-            if ($fileSizeBytes > 0 && $fileSizeBytes <= 49 * 1024 * 1024) {
+            $maxTelegramUploadBytes = ((int) config('telegram.max_upload_size_mb', 50)) * 1024 * 1024;
+
+            // Telegram Bot API has a 50MB limit on https://api.telegram.org,
+            // or up to 2000MB (2GB) when using a Local Telegram Bot API Server.
+            if ($fileSizeBytes > 0 && $fileSizeBytes <= $maxTelegramUploadBytes) {
                 $tgResult = $this->telegramService->uploadDocument(
                     chatId: $storageChannelId,
                     filePath: $fullPath,
@@ -74,7 +76,8 @@ class ResourceUploadService
                     caption: $formattedCaption,
                 );
             } else {
-                bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>49MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
+                $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
+                bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
             }
 
             $hasTgFile = ! empty($tgResult['file_id']);
