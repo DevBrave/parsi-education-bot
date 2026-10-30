@@ -248,6 +248,7 @@ class FileUploadHandler
 
         $adminChatId = config('telegram.admin_chat_id');
         if (empty($adminChatId)) {
+            bot_log('telegram')->warning("Parsi Bot Admins Channel Id is not found");
             return;
         }
 

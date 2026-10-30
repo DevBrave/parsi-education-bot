@@ -33,7 +33,7 @@ return [
         'not_selected' => 'Non selezionato',
         'change_language' => '🌐 Cambia Lingua',
         'change_program' => '🎓 Cambia Corso di Laurea',
-        'back_main' => '⬅️ Torna al Menu Principale',
+        'back_settings' => '⬅️ Torna alle Impostazioni',
         'change_language_prompt' => "🌐 <b>Select Preferred Language</b>\n\n"
             . "Please select your preferred language:\n"
             . "Seleziona la tua lingua preferita:\n"
@@ -56,7 +56,7 @@ return [
         'contact_coming_soon' => "⚠️ <b>Contatti / Segnalazioni</b>\n\nQuesta sezione sarà disponibile a breve! 🚀",
     ],
     'report' => [
-        'title' => "⚠️ <b>Centro Segnalazioni e Supporto</b>\n\n"
+        'hub_text' => "⚠️ <b>Centro Segnalazioni e Supporto</b>\n\n"
             . "Segnala un problema con un materiale didattico oppure invia un messaggio direttamente agli amministratori PARSI:\n\n"
             . "• Per segnalare un file danneggiato o errato, cercalo e premi <b>Segnala</b>.\n"
             . "• Per inviare una segnalazione scritta al team, premi <b>Invia Segnalazione agli Admin</b>.",
@@ -144,7 +144,6 @@ return [
         'back_courses' => '⬅️ Torna agli Insegnamenti',
         'back_types' => '⬅️ Torna alle Tipologie',
         'back_edu' => '⬅️ Torna ai Materiali Didattici',
-        'back_main' => '⬅️ Torna al Menu Principale',
     ],
     'tracks' => [
         'choose_track' => "🎯 <b>:program</b>\n\nScegli il tuo indirizzo di specializzazione:",
@@ -195,6 +194,8 @@ return [
             'copyright' => '⚖️ Violazione Copyright',
             'other' => '❓ Altro Problema',
         ],
+        'too_short' => '⚠️ Inserisci almeno 3 caratteri.',
+        'write_prompt' => "✍️ <b>Invia una Segnalazione al Team PARSI</b>\n\nDescrivi il problema, errore o anomalia riscontrata con questo materiale.\nI nostri amministratori verificheranno la segnalazione a breve:",
         'success' => "✅ <b>Grazie!</b> La tua segnalazione è stata inviata.\nIl nostro team la verificherà a breve.",
         'already_reported' => "ℹ️ Hai già segnalato questo materiale di recente. Lo stiamo verificando.",
         'cancel' => '❌ Annulla',
@@ -206,11 +207,13 @@ return [
             . "• <b>Scrivi ai Moderatori:</b> Invia le tue domande, suggerimenti o feedback tramite messaggio diretto al canale Telegram di PARSI.\n"
             . "• <b>Segnala un Materiale:</b> Se un file è danneggiato, errato o illeggibile, cercalo per inviare una segnalazione.\n"
             . "• <b>Canale Community:</b> Unisciti al nostro canale Telegram ufficiale per tutti gli aggiornamenti.",
+        'too_short' => '⚠️ Inserisci almeno 3 caratteri.',
         'report_material_btn' => '🔍 Cerca Materiale da Segnalare',
         'send_message_btn' => '💬 Invia Messaggio ai Moderatori',
         'channel_btn' => '📢 Canale Telegram PARSI',
         'write_prompt' => "✍️ <b>Contatta il Team PARSI</b>\n\nScrivi qui sotto il tuo messaggio o richiesta.\nI nostri moderatori lo riceveranno e ti risponderanno al più presto:",
         'sent_success' => "✅ <b>Messaggio Inviato!</b>\n\nGrazie per averci contattato. Il team PARSI ha ricevuto il tuo messaggio.",
+        'cancel' => '❌ Annulla',
         'cancelled' => 'Richiesta annullata.',
     ],
     'about' => [

@@ -4,6 +4,7 @@ namespace App\Telegram\Handlers;
 
 use App\Models\Course;
 use App\Models\Resource;
+use App\Models\ResourceReport;
 use App\Models\User;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
@@ -22,14 +23,15 @@ class MessageHandler
      */
     public function handle(array $message, User $user): void
     {
+        $lang = $user->preferred_language ?? 'en';
         $chatId = $message['chat']['id'];
         $text = trim($message['text'] ?? '');
-        $lang = $user->preferred_language ?? 'en';
 
         if (str_starts_with($text, '/start')) {
             $param = trim(substr($text, 6));
             if (str_starts_with($param, 'res_')) {
                 $resourceId = (int) substr($param, 4);
+                // using app function(lazy resolution) to prevent circular dependency exception
                 app(CallbackQueryHandler::class)->handleSendResourceDirect($chatId, $resourceId, $user);
 
                 return;
@@ -60,24 +62,13 @@ class MessageHandler
             );
         } elseif (in_array($text, ['📚 Study Resources', '📚 Educational Files', '📚 منابع درسی', '📚 فایل‌های آموزشی', '📚 Materiali Didattici'], true)) {
             $this->sendEducationalFiles($chatId, $user);
-        } elseif (in_array($text, ['📤 Submit Material', '📤 ارسال فایل درسی', '📤 Invia Materiale'], true)) {
-            $this->sendSubmitPrompt($chatId, $user);
         } elseif (in_array($text, ['🔍 Edisu', '🔍 ادیزو'], true)) {
             $this->telegram->sendMessage(
                 $chatId,
-                __('bot.sections.edisu_coming_soon', [], $lang),
-                ProgramMenuKeyboard::backToMain($lang, 'edisu')
-            );
-        } elseif (in_array($text, ['❓ Important Deadlines', '❓ Important Detail', '❓ ددلاین‌های مهم', '❓ Scadenze Importanti'], true)) {
-            $this->telegram->sendMessage(
-                $chatId,
-                __('bot.sections.deadlines_coming_soon', [], $lang),
-                ProgramMenuKeyboard::backToMain($lang, 'deadlines')
+                __('bot.sections.edisu_coming_soon', [], $lang)
             );
         } elseif (in_array($text, ['⚙️ Settings', '⚙️ تنظیمات', '⚙️ Impostazioni', '/settings'], true)) {
             $this->sendSettingsMenu($chatId, $user);
-        } elseif (in_array($text, ['🔎 Search Resources', '🔎 Cerca Risorse', '🔎  جستجوی منابع درسی', '🔍 Search Resources', '🔍 Cerca Risorse', '🔍 جستجوی منابع', '/search'], true)) {
-            $this->sendSearchPrompt($chatId, $user);
         } elseif (str_starts_with($text, '/search ')) {
             $this->executeSearch($chatId, $user, trim(substr($text, 8)));
         } elseif (in_array($text, ['📑 Tutorials & Guides', '📑 راهنماهای آموزشی', '📑 Guide e Tutorial', '/tutorials', '/guides'], true)) {
@@ -88,16 +79,24 @@ class MessageHandler
             $this->sendReportMenu($chatId, $user);
         } elseif (in_array($text, ['📞 Contact Us', '📞 Contattaci', '📞 تماس با ما', '/contact'], true)) {
             $this->sendContactMenu($chatId, $user);
-        } elseif (in_array($text, ['⚠️ Contact / Report', '⚠️ ارتباط / گزارش', '⚠️ Contatti / Segnalazioni'], true)) {
-            $this->sendContactReportMenu($chatId, $user);
         } elseif (in_array($text, ['ℹ️ About Us', 'ℹ️ Chi siamo', 'ℹ️ درباره ما', "\u{200F}ℹ️ درباره ما", 'درباره ما ℹ️', '/about'], true)) {
             $this->sendAboutUsMenu($chatId, $user);
         } else {
+
+            // TODO : ISSUE #2 - 
             $contactCacheKey = "user_contact_state:{$user->id}";
             $contactState = Cache::get($contactCacheKey);
             if ($contactState && ($contactState['step'] ?? null) === 'awaiting_contact_message') {
                 Cache::forget($contactCacheKey);
                 $this->handleContactMessageSubmit($chatId, $user, trim($text));
+                return;
+            }
+
+            $contactCacheKey = "user_report_state:{$user->id}";
+            $contactState = Cache::get($contactCacheKey);
+            if ($contactState && ($contactState['step'] ?? null) === 'awaiting_report_message') {
+                Cache::forget($contactCacheKey);
+                $this->handleReportMessageSubmit($chatId, $user, trim($text));
                 return;
             }
 
@@ -136,14 +135,7 @@ class MessageHandler
                 );
                 return;
             }
-            // TODO: Adding llm into the project and genrate a text based on user input
-            $msg = __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang);
-
-            $this->telegram->sendMessage(
-                $chatId,
-                $msg,
-                MainMenuKeyboard::build($lang)
-            );
+            $this->executeSearch($chatId, $user, trim($text));
         }
     }
 
@@ -183,13 +175,7 @@ class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $text,
-            [
-                'inline_keyboard' => [
-                    [['text' => __('bot.settings.change_language', [], $lang), 'callback_data' => 'change_language']],
-                    [['text' => __('bot.settings.change_program', [], $lang), 'callback_data' => 'change_program']],
-                    [['text' => __('bot.settings.back_main', [], $lang), 'callback_data' => 'back_main_settings']],
-                ],
-            ]
+            ProgramMenuKeyboard::settingsMenu($lang)
         );
     }
 
@@ -275,7 +261,7 @@ class MessageHandler
     public function executeSearch(int $chatId, User $user, string $query, bool $showNavigation = true): void
     {
         $lang = $user->preferred_language ?? 'en';
-
+        
         if (mb_strlen($query) < 2) {
             $replyMarkup = $showNavigation ? ProgramMenuKeyboard::searchPrompt($lang) : null;
             $this->telegram->sendMessage(
@@ -346,8 +332,7 @@ class MessageHandler
         $lang = $user->preferred_language ?? 'en';
         $this->telegram->sendMessage(
             $chatId,
-            __('bot.sections.tutorials_coming_soon', [], $lang),
-            ProgramMenuKeyboard::backToMain($lang, 'tutorials')
+            __('bot.sections.tutorials_coming_soon', [], $lang)
         );
     }
 
@@ -359,8 +344,7 @@ class MessageHandler
         $lang = $user->preferred_language ?? 'en';
         $this->telegram->sendMessage(
             $chatId,
-            __('bot.sections.groups_coming_soon', [], $lang),
-            ProgramMenuKeyboard::backToMain($lang, 'groups')
+            __('bot.sections.groups_coming_soon', [], $lang)
         );
     }
 
@@ -372,7 +356,7 @@ class MessageHandler
         $lang = $user->preferred_language ?? 'en';
         $this->telegram->sendMessage(
             $chatId,
-            __('bot.report.title', [], $lang),
+            __('bot.report.hub_text', [], $lang),
             ProgramMenuKeyboard::reportMenu($lang)
         );
     }
@@ -391,11 +375,37 @@ class MessageHandler
     }
 
     /**
-     * Send Contact & Report Hub menu (compatibility fallback).
+     * Handle submission of student Report / feedback message.
      */
-    public function sendContactReportMenu(int $chatId, User $user): void
+    public function handleReportMessageSubmit(int $chatId, User $user, string $text): void
     {
-        $this->sendContactMenu($chatId, $user);
+        $lang = $user->preferred_language ?? 'en';
+
+        if (mb_strlen($text) < 3) {
+            $this->telegram->sendMessage($chatId, __('bot.reports.too_short', [], $lang));
+            return;
+        }
+
+        $adminChatId = config('telegram.admin_chat_id');
+        if ($adminChatId) {
+            $sender = $user->username
+                ? '@' . $user->username
+                : ($user->first_name ? $user->first_name : "User #{$user->telegram_user_id}");
+            $program = $user->program?->name ?? 'Not set';
+
+            $adminText = "📬 <b>New Student Report</b>\n\n"
+                . "👤 <b>From:</b> " . e($sender) . " (ID: <code>{$user->telegram_user_id}</code>)\n"
+                . "🎓 <b>Program:</b> " . e($program) . "\n\n"
+                . "💬 <b>Message:</b>\n" . e($text);
+
+            $this->telegram->sendMessage($adminChatId, $adminText);
+        }
+
+        $this->telegram->sendMessage(
+            $chatId,
+            __('bot.reports.sent_success', [], $lang),
+            MainMenuKeyboard::build($lang)
+        );
     }
 
     /**
@@ -406,7 +416,7 @@ class MessageHandler
         $lang = $user->preferred_language ?? 'en';
 
         if (mb_strlen($text) < 3) {
-            $this->telegram->sendMessage($chatId, __('bot.search.too_short', [], $lang));
+            $this->telegram->sendMessage($chatId, __('bot.contact.too_short', [], $lang));
             return;
         }
 

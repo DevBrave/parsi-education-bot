@@ -41,10 +41,12 @@ return new class extends Migration
             $table->index(['course_id', 'resource_type_id', 'academic_year_id', 'status'], 'idx_resources_browse');
             $table->index('exam_date', 'idx_resources_exam_date');
 
-            $table->fullText(
-                ['title', 'description'],
-                'ft_resources_text'
-            );
+            if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+                $table->fullText(
+                    ['title', 'description'],
+                    'ft_resources_text'
+                );
+            }
 
         });
 

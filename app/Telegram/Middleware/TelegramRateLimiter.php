@@ -69,7 +69,6 @@ class TelegramRateLimiter
                     $this->telegram->answerCallbackQuery(
                         $callbackId,
                         __('bot.rate_limit.too_many_clicks', [], $lang),
-                        true // alert dialog
                     );
                 }
 

@@ -36,6 +36,7 @@ class TelegramWebhookController extends Controller
 
         // Inline queries are time-critical (< 1-2s Telegram UI timeout).
         // Execute synchronously so Telegram receives answerInlineQuery immediately without queue delay.
+        // Instead of passing it to the background queue
         if (isset($payload['inline_query'])) {
             app(\App\Telegram\TelegramUpdateDispatcher::class)->dispatch($payload);
             return response()->noContent();

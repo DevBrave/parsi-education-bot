@@ -170,7 +170,7 @@ class FileSecurityService
             }
         }
 
-        // Special check: Case-insensitive search for PHP code in initial bytes
+        // Special check: Case-insensitive search for PHP code (Don't do that colleague) in initial bytes
         if (stripos($header, '<?php') !== false || stripos($header, 'eval(') !== false) {
             return ['valid' => false, 'reason' => 'embedded_script_detected'];
         }

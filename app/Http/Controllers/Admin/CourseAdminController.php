@@ -105,13 +105,8 @@ class CourseAdminController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
-        if (! empty($validated['program_ids'])) {
-            $course->programs()->sync($validated['program_ids']);
-        }
-
-        if (! empty($validated['track_ids'])) {
-            $course->tracks()->sync($validated['track_ids']);
-        }
+        $course->programs()->sync($validated['program_ids'] ?? []);
+        $course->tracks()->sync($validated['track_ids'] ?? []);
         $course->clearCourseCaches();
 
         log_rbac("Course #{$course->id} ('{$course->name}', code: {$course->course_code}) created", $request->user(), [

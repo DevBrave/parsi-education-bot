@@ -41,7 +41,7 @@ class TelegramUpdateDispatcher
             if ($from && isset($from['id'])) {
                 $user = $this->resolveUser($from);
                 if ($user && ! $user->is_blocked) {
-                    $this->inlineQueryHandler->handle($inlineQuery, $user);
+                    $this->inlineQueryHandler->handle($inlineQuery, $user); // Yes, we do not care about blocked user 
                 }
             }
 
@@ -55,11 +55,15 @@ class TelegramUpdateDispatcher
             return;
         }
 
+        // Traffic Controller - Only 3 places that bot can respond to the update
         $chatType = $message['chat']['type'] ?? ($callbackQuery['message']['chat']['type'] ?? 'private');
         $isGroup = in_array($chatType, ['group', 'supergroup'], true);
         $callbackData = $callbackQuery['data'] ?? '';
         $isAdminModerationCallback = str_starts_with($callbackData, 'admin_approve_') || str_starts_with($callbackData, 'admin_reject_');
-        $isGroupAllowedCallback = str_starts_with($callbackData, 'send_resource_') || str_starts_with($callbackData, 'course_') || str_starts_with($callbackData, 'resource_type_') || str_starts_with($callbackData, 'res_page_');
+        $isGroupAllowedCallback = str_starts_with($callbackData, 'send_resource_') ||
+            str_starts_with($callbackData, 'course_') ||
+            str_starts_with($callbackData, 'resource_type_') ||
+            str_starts_with($callbackData, 'res_page_');
 
         if ($chatType !== 'private' && ! $isAdminModerationCallback && ! $isGroup) {
             return;

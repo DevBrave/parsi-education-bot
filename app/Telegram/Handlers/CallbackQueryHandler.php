@@ -16,8 +16,6 @@ use App\Telegram\Keyboards\OnboardingKeyboard;
 use App\Telegram\Keyboards\ProgramMenuKeyboard;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Lang;
-use Illuminate\Support\Facades\Log;
 
 class CallbackQueryHandler
 {
@@ -32,18 +30,18 @@ class CallbackQueryHandler
      */
     public function handle(array $callbackQuery, User $user): void
     {
+        $lang = $user->preferred_language ?? 'en';
         $callbackId = $callbackQuery['id'];
         $data = $callbackQuery['data'] ?? '';
-        $lang = $user->preferred_language ?? 'en';
 
-        // Only message-backed inline menus can be edited by this bot.
-        if (! isset($callbackQuery['message']['chat']['id'], $callbackQuery['message']['message_id'])) {
+        // Ignore button clicks from shared inline query cards where chat_id or message_id is missing
+        $chatId = $callbackQuery['message']['chat']['id'] ?? null;
+        $messageId = $callbackQuery['message']['message_id'] ?? null;
+
+        if (! $chatId || ! $messageId) {
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
-
-        $chatId = $callbackQuery['message']['chat']['id'];
-        $messageId = $callbackQuery['message']['message_id'];
 
         // Handle one-click Admin Moderation callbacks from the Admin Group
         if (str_starts_with($data, 'admin_approve_')) {
@@ -63,28 +61,7 @@ class CallbackQueryHandler
         // Acknowledge the button press to remove the loading spinner for student menus
         $this->telegram->answerCallbackQuery($callbackId);
 
-        if ($data === 'back_main' || str_starts_with($data, 'back_main_')) {
-            $sectionKey = str_starts_with($data, 'back_main_')
-                ? substr($data, strlen('back_main_'))
-                : null;
-
-            $sectionTitle = $sectionKey && Lang::has("bot.sections.{$sectionKey}", $lang)
-                ? __("bot.sections.{$sectionKey}", [], $lang)
-                : __('bot.menu.default_section', [], $lang);
-
-            $this->telegram->editMessageText(
-                $chatId,
-                $messageId,
-                __('bot.menu.closed', ['lastSection' => $sectionTitle], $lang),
-                ['inline_keyboard' => []]
-            );
-
-            $this->telegram->sendMessage(
-                $chatId,
-                __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
-                MainMenuKeyboard::build($lang)
-            );
-        } elseif ($data === 'back_edu_hub') {
+        if ($data === 'back_edu_hub') {
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
@@ -96,7 +73,24 @@ class CallbackQueryHandler
                 $chatId,
                 $messageId,
                 __('bot.onboarding.degree_prompt', [], $lang),
-                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_main_settings')
+                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_settings')
+            );
+        } elseif ($data === 'back_settings') {
+            $programName = $user->program ? $user->program->name : __('bot.settings.not_selected', [], $lang);
+            $langLabel = match ($lang) {
+                'it' => 'Italiano',
+                'fa' => 'فارسی',
+                default => 'English',
+            };
+            $text = __('bot.settings.title', [
+                'lang' => $langLabel,
+                'program' => e($programName),
+            ], $lang);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $text,
+                ProgramMenuKeyboard::settingsMenu($lang)
             );
         } elseif ($data === 'change_language') {
             $this->telegram->editMessageText(
@@ -130,7 +124,7 @@ class CallbackQueryHandler
                 [
                     'inline_keyboard' => [
                         [
-                            ['text' => __('bot.submit_material.cancel', [], $lang), 'callback_data' => 'cancel_contact'],
+                            ['text' => __('bot.contact.cancel', [], $lang), 'callback_data' => 'cancel_contact'],
                         ],
                     ],
                 ]
@@ -141,6 +135,33 @@ class CallbackQueryHandler
                 $chatId,
                 $messageId,
                 __('bot.contact.cancelled', [], $lang),
+                ['inline_keyboard' => []]
+            );
+            $this->telegram->sendMessage(
+                $chatId,
+                __('bot.menu.choose_option', ['name' => e($user->first_name)], $lang),
+                MainMenuKeyboard::build($lang)
+            );
+        } elseif ($data === 'report_prompt') {
+            Cache::put("user_reeport_state:{$user->id}", ['step' => 'awaiting_report_message'], now()->addMinutes(15));
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.reports.write_prompt', [], $lang),
+                [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => __('bot.reports.cancel', [], $lang), 'callback_data' => 'cancel_report'],
+                        ],
+                    ],
+                ]
+            );
+        } elseif ($data === 'cancel_report') {
+            Cache::forget("user_report_state:{$user->id}");
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.reports.cancelled', [], $lang),
                 ['inline_keyboard' => []]
             );
             $this->telegram->sendMessage(
@@ -162,50 +183,17 @@ class CallbackQueryHandler
                 __('bot.about.text', [], $lang),
                 ProgramMenuKeyboard::aboutUsMenu($lang)
             );
-        } elseif ($data === 'edu_browse' || $data === 'edu_files') {
-            if ($user->program_id && $user->program && $user->program->is_active) {
-                $levelTag = $user->program->degree_level ? " ({$user->program->degree_level})" : '';
-                $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
-                $text = __('bot.courses.choose_year', [
-                    'program' => e($user->program->name) . $levelTag . $trackTag,
-                ], $lang);
-
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    $text,
-                    ProgramMenuKeyboard::years($user->program, $lang)
-                );
-            } else {
-                $this->telegram->editMessageText(   
-                    $chatId,
-                    $messageId,
-                    __('bot.onboarding.degree_prompt', [], $lang),
-                    ProgramMenuKeyboard::degrees($lang, backCallback: 'back_edu_hub')
-                );
-            }
-        } elseif ($data === 'edu_submit_start') {
-            if ($user->program_id && $user->program && $user->program->is_active) {
-                $levelTag = $user->program->degree_level ? " ({$user->program->degree_level})" : '';
-                $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
-                $text = __('bot.courses.choose_year', [
-                    'program' => e($user->program->name) . $levelTag . $trackTag,
-                ], $lang);
-
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    $text,
-                    ProgramMenuKeyboard::years($user->program, $lang, forSubmission: true)
-                );
-            } else {
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    __('bot.onboarding.degree_prompt', [], $lang),
-                    ProgramMenuKeyboard::degrees($lang, backCallback: 'back_edu_hub')
-                );
-            }
+        } elseif ($data === 'edu_browse' || $data === 'edu_submit_start') {
+            $forSubmission = ($data === 'edu_submit_start');
+            $levelTag = $user->program?->degree_level ? " ({$user->program->degree_level})" : '';
+            $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
+            $programName = $user->program ? e($user->program->name) : '';
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                __('bot.courses.choose_year', ['program' => $programName . $levelTag . $trackTag], $lang),
+                ProgramMenuKeyboard::years($user->program, $lang, forSubmission: $forSubmission)
+            );
         } elseif (str_starts_with($data, 'select_degree_')) {
             $degreeLevel = substr($data, strlen('select_degree_'));
             $this->telegram->editMessageText(
@@ -219,7 +207,7 @@ class CallbackQueryHandler
                 $chatId,
                 $messageId,
                 __('bot.onboarding.degree_prompt', [], $lang),
-                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_main_settings')
+                ProgramMenuKeyboard::degrees($lang, backCallback: 'back_settings')
             );
         } elseif (str_starts_with($data, 'select_program_')) {
             $programId = (int) substr($data, strlen('select_program_'));
@@ -792,6 +780,7 @@ class CallbackQueryHandler
 
         $courseName = $resource->course?->name ? e($resource->course->name) : 'Course Material';
         $title = e($resource->title);
+        
         $contributor = $resource->submitter?->username
             ? '@' . e($resource->submitter->username)
             : ($resource->submitter?->first_name ? e($resource->submitter->first_name) : null);
@@ -800,6 +789,11 @@ class CallbackQueryHandler
             'title' => $title,
         ], $lang);
 
+        if (! empty($resource->description)) {
+            $rawDesc = trim($resource->description);
+            $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
+            $baseCaption .= "\n\n📝 <b>Description:</b>\n" . $cleanDesc;
+        }
         // Contributor display is currently disabled
         // if ($contributor) {
         //     $baseCaption .= __('bot.resources.caption_contributor', ['contributor' => $contributor], $lang);

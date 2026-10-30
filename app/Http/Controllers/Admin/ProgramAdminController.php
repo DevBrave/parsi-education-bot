@@ -14,7 +14,9 @@ class ProgramAdminController extends Controller
      */
     public function index()
     {
-        $programs = Program::withCount('courses')
+        $programs = Program::withCount(['courses', 'tracks'])
+            ->with('tracks')
+            ->orderBy('degree_level')
             ->orderBy('name')
             ->get();
 
@@ -42,6 +44,9 @@ class ProgramAdminController extends Controller
             'degree_level' => ['required', 'string', 'max:20'],
             'university' => ['nullable', 'string', 'max:150'],
             'is_active' => ['nullable', 'boolean'],
+            'tracks' => ['nullable', 'array'],
+            'tracks.*.name' => ['nullable', 'string', 'max:150'],
+            'tracks.*.code' => ['nullable', 'string', 'max:30'],
         ], [
             'name.unique' => 'A programme with this name and degree level already exists.',
         ]);
@@ -52,6 +57,21 @@ class ProgramAdminController extends Controller
             'university' => ! empty($validated['university']) ? trim($validated['university']) : 'Politecnico di Torino',
             'is_active' => $request->boolean('is_active', true),
         ]);
+
+        // Save specialization tracks if this is a Master's (MSc) programme
+        if (strtoupper($program->degree_level) === 'MSC' && ! empty($validated['tracks'])) {
+            foreach ($validated['tracks'] as $trackData) {
+                $trackName = trim($trackData['name'] ?? '');
+                if ($trackName === '') {
+                    continue;
+                }
+                $program->tracks()->create([
+                    'name' => $trackName,
+                    'code' => ! empty($trackData['code']) ? strtoupper(trim($trackData['code'])) : null,
+                    'is_active' => true,
+                ]);
+            }
+        }
 
         log_rbac("Degree programme #{$program->id} ('{$program->name}', {$program->degree_level}) created", $request->user(), [
             'program_id' => $program->id,
@@ -69,7 +89,7 @@ class ProgramAdminController extends Controller
     public function edit(Program $program)
     {
         return view('admin.programs.edit', [
-            'program' => $program,
+            'program' => $program->load('tracks'),
         ]);
     }
 
@@ -94,6 +114,10 @@ class ProgramAdminController extends Controller
             'degree_level' => ['required', 'string', 'max:20'],
             'university' => ['nullable', 'string', 'max:150'],
             'is_active' => ['nullable', 'boolean'],
+            'tracks' => ['nullable', 'array'],
+            'tracks.*.id' => ['nullable', 'integer', 'exists:tracks,id'],
+            'tracks.*.name' => ['nullable', 'string', 'max:150'],
+            'tracks.*.code' => ['nullable', 'string', 'max:30'],
         ], [
             'name.unique' => 'A programme with this name and degree level already exists.',
         ]);
@@ -104,6 +128,42 @@ class ProgramAdminController extends Controller
             'university' => ! empty($validated['university']) ? trim($validated['university']) : 'Politecnico di Torino',
             'is_active' => $request->boolean('is_active'),
         ]);
+
+        // Sync specialization tracks if this is a Master's (MSc) programme
+        if (strtoupper($program->degree_level) === 'MSC') {
+            $persistedTrackIds = [];
+            foreach ($validated['tracks'] ?? [] as $trackData) {
+                $trackName = trim($trackData['name'] ?? '');
+                if ($trackName === '') {
+                    continue;
+                }
+                $trackCode = ! empty($trackData['code']) ? strtoupper(trim($trackData['code'])) : null;
+
+                if (! empty($trackData['id'])) {
+                    $existingTrack = $program->tracks()->find($trackData['id']);
+                    if ($existingTrack) {
+                        $existingTrack->update([
+                            'name' => $trackName,
+                            'code' => $trackCode,
+                        ]);
+                        $persistedTrackIds[] = $existingTrack->id;
+                    }
+                } else {
+                    $newTrack = $program->tracks()->create([
+                        'name' => $trackName,
+                        'code' => $trackCode,
+                        'is_active' => true,
+                    ]);
+                    $persistedTrackIds[] = $newTrack->id;
+                }
+            }
+
+            // Remove tracks deleted by user from the form
+            $program->tracks()->whereNotIn('id', $persistedTrackIds)->delete();
+        } else {
+            // If degree level changed away from MSc (e.g. to BSc), remove tracks
+            $program->tracks()->delete();
+        }
 
         log_rbac("Degree programme #{$program->id} ('{$program->name}', {$program->degree_level}) updated", $request->user(), [
             'program_id' => $program->id,

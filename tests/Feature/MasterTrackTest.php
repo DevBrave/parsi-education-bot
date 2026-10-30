@@ -41,7 +41,8 @@ class MasterTrackTest extends TestCase
         $this->seed(MasterTrackSeeder::class);
 
         $msc = Program::where('name', 'Computer Engineering')->where('degree_level', 'MSc')->first();
-        $user = User::factory()->create(['preferred_language' => 'en']);
+        $oldProgram = Program::create(['name' => 'Automotive Engineering', 'degree_level' => 'BSc']);
+        $user = User::factory()->create(['preferred_language' => 'en', 'program_id' => $oldProgram->id]);
 
         $this->invokeHandler('handleCallbackQuery', [
             [

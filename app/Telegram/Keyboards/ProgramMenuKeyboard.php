@@ -29,9 +29,6 @@ class ProgramMenuKeyboard
                 [
                     ['text' => __('bot.education_hub.submit_btn', [], $lang), 'callback_data' => 'edu_submit_start'],
                 ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_educational_files'],
-                ],
             ],
         ];
     }
@@ -60,13 +57,16 @@ class ProgramMenuKeyboard
             ];
         }
 
-        $backText = $backCallback === 'back_edu_hub'
-            ? __('bot.courses.back_edu', [], $lang)
-            : __('bot.courses.back_main', [], $lang);
+        if ($backCallback) {
+            $backText = match ($backCallback) {
+                'back_settings' => __('bot.settings.back_settings', [], $lang),
+                default => __('bot.courses.back_edu', [], $lang),
+            };
 
-        $rows[] = [
-            ['text' => $backText, 'callback_data' => $backCallback],
-        ];
+            $rows[] = [
+                ['text' => $backText, 'callback_data' => $backCallback],
+            ];
+        }
 
         return ['inline_keyboard' => $rows];
     }
@@ -108,9 +108,10 @@ class ProgramMenuKeyboard
         }
 
         if ($backCallback) {
-            $backText = $backCallback === 'back_edu_hub'
-                ? __('bot.courses.back_edu', [], $lang)
-                : __('bot.courses.back_main', [], $lang);
+            $backText = match ($backCallback) {
+                'back_settings' => __('bot.settings.back_settings', [], $lang),
+                default => __('bot.courses.back_edu', [], $lang),
+            };
 
             $buttons[] = [
                 [
@@ -203,6 +204,11 @@ class ProgramMenuKeyboard
                 ['text' => "🎯 {$track->name}{$codeTag}", 'callback_data' => "{$prefix}{$track->id}"],
             ];
         }
+
+        $allTracksCallback = $forSubmission ? "submit_track_{$program->id}_all" : "track_{$program->id}_all";
+        $buttons[] = [
+            ['text' => __('bot.tracks.all_tracks', [], $lang), 'callback_data' => $allTracksCallback],
+        ];
 
         $backText = str_starts_with($backCallback, 'select_degree_')
             ? (__('bot.tracks.back_to_programs', [], $lang) ?: '⬅️ Back to Programs')
@@ -300,13 +306,16 @@ class ProgramMenuKeyboard
             ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
         ];
 
-        $backText = $backCallback === 'back_edu_hub'
-            ? __('bot.courses.back_edu', [], $lang)
-            : __('bot.courses.back_main', [], $lang);
+        if ($backCallback) {
+            $backText = match ($backCallback) {
+                'back_settings' => __('bot.settings.back_settings', [], $lang),
+                default => __('bot.courses.back_edu', [], $lang),
+            };
 
-        $buttons[] = [
-            ['text' => $backText, 'callback_data' => $backCallback],
-        ];
+            $buttons[] = [
+                ['text' => $backText, 'callback_data' => $backCallback],
+            ];
+        }
 
         return ['inline_keyboard' => $buttons];
     }
@@ -757,16 +766,16 @@ class ProgramMenuKeyboard
     }
 
     /**
-     * Single back to main menu inline keyboard.
+     * Settings menu inline keyboard.
      */
-    public static function backToMain(?string $lang = 'en', ?string $section = null): array
+    public static function settingsMenu(?string $lang = 'en'): array
     {
         $lang = $lang ?: 'en';
-        $callbackData = $section ? "back_main_{$section}" : 'back_main';
 
         return [
             'inline_keyboard' => [
-                [['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => $callbackData]],
+                [['text' => __('bot.settings.change_language', [], $lang), 'callback_data' => 'change_language']],
+                [['text' => __('bot.settings.change_program', [], $lang), 'callback_data' => 'change_program']],
             ],
         ];
     }
@@ -882,13 +891,10 @@ class ProgramMenuKeyboard
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'contact_prompt'],
+                    ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'report_prompt'],
                 ],
                 [
                     ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
-                ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_contact'],
                 ],
             ],
         ];
@@ -908,9 +914,6 @@ class ProgramMenuKeyboard
                 ],
                 [
                     ['text' => __('bot.report.send_report_btn', [], $lang), 'callback_data' => 'contact_prompt'],
-                ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_report'],
                 ],
             ],
         ];
@@ -941,9 +944,6 @@ class ProgramMenuKeyboard
                 [
                     ['text' => __('bot.tutorials.channel_guides_btn', [], $lang), 'url' => "https://t.me/{$channel}"],
                 ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_tutorials'],
-                ],
             ],
         ];
     }
@@ -968,9 +968,6 @@ class ProgramMenuKeyboard
                 [
                     ['text' => __('bot.about.insta_btn', [], $lang), 'url' => str_starts_with($instagram_page, 'http') ? $instagram_page : 'https://www.instagram.com/' . ltrim($instagram_page, '@/ ')],
                 ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_about'],
-                ],
             ],
         ];
     }
@@ -986,9 +983,6 @@ class ProgramMenuKeyboard
             'inline_keyboard' => [
                 [
                     ['text' => __('bot.about.back_about', [], $lang), 'callback_data' => 'back_about'],
-                ],
-                [
-                    ['text' => __('bot.courses.back_main', [], $lang), 'callback_data' => 'back_main_about'],
                 ],
             ],
         ];
