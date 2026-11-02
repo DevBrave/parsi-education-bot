@@ -30,7 +30,6 @@ class ResourceUploadService
 
         if (! file_exists($fullPath)) {
             bot_log('telegram')->error("Resource file does not exist on disk: {$fullPath}");
-            $resourceFile->resource?->delete();
 
             return false;
         }
@@ -79,6 +78,14 @@ class ResourceUploadService
                         caption: $formattedCaption,
                     );
                     $hasTgFile = ! empty($tgResult['file_id']);
+                    if ($hasTgFile) {
+                        // Publish Telegram status before potentially slow Drive authentication/upload.
+                        $resourceFile->update([
+                            'telegram_file_id' => $tgResult['file_id'],
+                            'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
+                            'telegram_message_id' => $tgResult['message_id'] ?? null,
+                        ]);
+                    }
                 } else {
                     $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
                     bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
@@ -129,7 +136,6 @@ class ResourceUploadService
             if (! $hasTgFile && ! $driveFileId) {
                 bot_log('telegram')->error("Failed to sync ResourceFile #{$resourceFile->id}: both Telegram and Google Drive were unavailable.");
                 $resourceFile->resource?->update(['status' => 'rejected']);
-                Storage::disk('local')->delete($storedPath);
 
                 return false;
             }
@@ -140,11 +146,13 @@ class ResourceUploadService
                 'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? $freshFile->telegram_file_unique_id,
                 'telegram_message_id' => $tgResult['message_id'] ?? $freshFile->telegram_message_id,
                 'drive_file_id' => $driveFileId,
-                'local_path' => null,
+                'local_path' => $driveFileId ? null : $storedPath,
             ]);
 
             // 4. Remove temporary file from local VPS disk to conserve storage
-            Storage::disk('local')->delete($storedPath);
+            if ($driveFileId) {
+                Storage::disk('local')->delete($storedPath);
+            }
 
             bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: ".($hasTgFile ? 'yes' : 'no').', Drive: '.($driveFileId ? 'yes' : 'no').').');
 
@@ -152,8 +160,7 @@ class ResourceUploadService
         } catch (\Throwable $e) {
             bot_log('telegram')->error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
             $resourceFile->resource?->update(['status' => 'rejected']);
-            // Clean up temporary local file on failure
-            Storage::disk('local')->delete($storedPath);
+            // Retain the source so a failed external upload can be recovered.
 
             return false;
         }

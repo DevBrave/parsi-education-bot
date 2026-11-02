@@ -17,7 +17,6 @@ use App\Services\TelegramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ResourceAdminController extends Controller
@@ -30,7 +29,6 @@ class ResourceAdminController extends Controller
         $query = Resource::with(['course.programs', 'resourceType', 'academicYear', 'files', 'submitter'])
             ->latest();
 
-        
         // 1. Search Filter
         if ($request->filled('search')) {
             $search = trim($request->input('search'));
@@ -95,7 +93,7 @@ class ResourceAdminController extends Controller
         }
 
         $resources = $query->paginate(15)->withQueryString();
-        
+
         // Platform Sync & Source Stats
         $stats = [
             'total' => Resource::count(),
@@ -179,7 +177,7 @@ class ResourceAdminController extends Controller
             'language' => ['nullable', 'string', 'in:en,it,fa'],
             'status' => ['required', 'string', 'in:approved,pending,rejected'],
             'files' => ['required', 'array', 'min:1'],
-            'files.*' => ['file', 'mimes:' . FileSecurityService::allowedMimesString(), 'max:512000'], // max 500MB per file
+            'files.*' => ['file', 'mimes:'.FileSecurityService::allowedMimesString(), 'max:512000'], // max 500MB per file
         ]);
 
         if ($user && $user->isProfessor() && $user->program_id) {
@@ -240,7 +238,7 @@ class ResourceAdminController extends Controller
             $records = [];
             foreach ($filesToUpload as $item) {
                 $file = $item['file'];
-                $storedPath = $file->store('resources');
+                $storedPath = $file->store('resources', 'local');
 
                 $resourceFile = $resource->files()->create([
                     'original_filename' => $file->getClientOriginalName(),
@@ -265,7 +263,7 @@ class ResourceAdminController extends Controller
         }
 
         $resourceId = $createdFiles[0]['resourceFile']->resource_id ?? null;
-        log_rbac("Resource #{$resourceId} ('{$validated['title']}') created with " . count($createdFiles) . " file(s)", $request->user(), [
+        log_rbac("Resource #{$resourceId} ('{$validated['title']}') created with ".count($createdFiles).' file(s)', $request->user(), [
             'resource_id' => $resourceId,
             'course_id' => $validated['course_id'],
             'files_count' => count($createdFiles),
@@ -273,7 +271,7 @@ class ResourceAdminController extends Controller
 
         return redirect()
             ->route('admin.resources.index')
-            ->with('success', count($createdFiles) . ' file(s) uploaded! Syncing with Telegram and Google Drive in the background...');
+            ->with('success', count($createdFiles).' file(s) uploaded! Syncing with Telegram and Google Drive in the background...');
     }
 
     /**
@@ -322,8 +320,8 @@ class ResourceAdminController extends Controller
             'language' => ['nullable', 'string', 'in:en,it,fa'],
             'status' => ['required', 'string', 'in:approved,pending,rejected'],
             'files' => ['nullable', 'array'],
-            'files.*' => ['file', 'mimes:' . FileSecurityService::allowedMimesString(), 'max:512000'], // max 500MB per file
-            'file' => ['nullable', 'file', 'mimes:' . FileSecurityService::allowedMimesString(), 'max:512000'],
+            'files.*' => ['file', 'mimes:'.FileSecurityService::allowedMimesString(), 'max:512000'], // max 500MB per file
+            'file' => ['nullable', 'file', 'mimes:'.FileSecurityService::allowedMimesString(), 'max:512000'],
         ]);
 
         $resource->update([
@@ -383,7 +381,7 @@ class ResourceAdminController extends Controller
                 $records = [];
                 foreach ($filesToUpload as $item) {
                     $file = $item['file'];
-                    $storedPath = $file->store('resources');
+                    $storedPath = $file->store('resources', 'local');
 
                     $resourceFile = $resource->files()->create([
                         'original_filename' => $file->getClientOriginalName(),
@@ -427,7 +425,7 @@ class ResourceAdminController extends Controller
         ]);
 
         $extraMsg = ! empty($createdFiles)
-            ? ' and ' . count($createdFiles) . ' new file(s) attached for background syncing'
+            ? ' and '.count($createdFiles).' new file(s) attached for background syncing'
             : '';
 
         return redirect()
@@ -466,7 +464,7 @@ class ResourceAdminController extends Controller
             try {
                 $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
             } catch (\Throwable $e) {
-                bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: ".$e->getMessage());
             }
         }
 
@@ -523,7 +521,7 @@ class ResourceAdminController extends Controller
                 try {
                     $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
                 } catch (\Throwable $e) {
-                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: ".$e->getMessage());
                 }
             }
             $file->delete();
@@ -568,7 +566,7 @@ class ResourceAdminController extends Controller
 
                     return response($response->body(), 200, [
                         'Content-Type' => $mime,
-                        'Content-Disposition' => 'attachment; filename="' . addslashes($file->original_filename) . '"',
+                        'Content-Disposition' => 'attachment; filename="'.addslashes($file->original_filename).'"',
                     ]);
                 }
             }
@@ -648,7 +646,7 @@ class ResourceAdminController extends Controller
                         $failedCount++;
                     }
                 } catch (\Throwable $fileEx) {
-                    bot_log('drive')->error("Failed syncing file {$file->id} to Google Drive: " . $fileEx->getMessage());
+                    bot_log('drive')->error("Failed syncing file {$file->id} to Google Drive: ".$fileEx->getMessage());
                     $failedCount++;
                 } finally {
                     if ($tempPath && file_exists($tempPath)) {
@@ -671,10 +669,9 @@ class ResourceAdminController extends Controller
 
             return redirect()->route('admin.resources.edit', $resource)->with('info', 'All files for this resource are already synced to Google Drive.');
         } catch (\Throwable $e) {
-            bot_log('drive')->error("Manual Drive sync error on Resource #{$resource->id}: " . $e->getMessage());
+            bot_log('drive')->error("Manual Drive sync error on Resource #{$resource->id}: ".$e->getMessage());
 
-            return redirect()->route('admin.resources.edit', $resource)->with('error', 'Google Drive sync failed: ' . $e->getMessage());
+            return redirect()->route('admin.resources.edit', $resource)->with('error', 'Google Drive sync failed: '.$e->getMessage());
         }
     }
 }
-

@@ -7,6 +7,7 @@ use Google\Http\MediaFileUpload;
 use Google\Service\Drive as GoogleDrive;
 use Google\Service\Drive\DriveFile;
 use Google\Service\Drive\Permission;
+use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
 class GoogleDriveService
@@ -39,6 +40,7 @@ class GoogleDriveService
         if ($clientId && $clientSecret && $refreshToken) {
             try {
                 $client = new GoogleClient;
+                $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
                 $client->setClientId($clientId);
                 $client->setClientSecret($clientSecret);
                 $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
@@ -61,6 +63,7 @@ class GoogleDriveService
         if ($credentialsPath && file_exists($credentialsPath)) {
             try {
                 $client = new GoogleClient;
+                $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
                 $client->setAuthConfig($credentialsPath);
                 $client->addScope(GoogleDrive::DRIVE);
                 $this->client = $client;
