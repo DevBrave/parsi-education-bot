@@ -3,10 +3,47 @@
 namespace Tests\Unit;
 
 use App\Services\GoogleDriveService;
+use Google\Client as GoogleClient;
+use Mockery;
 use Tests\TestCase;
 
 class GoogleDriveServiceTest extends TestCase
 {
+    public function test_oauth_failure_does_not_fall_back_to_service_account(): void
+    {
+        config([
+            'google.client_id' => 'test-client',
+            'google.client_secret' => 'test-secret',
+            'google.refresh_token' => 'test-refresh',
+            'google.service_account_json' => __FILE__,
+        ]);
+        foreach (['exception', 'rejected'] as $failure) {
+            $client = Mockery::mock(GoogleClient::class);
+            $client->shouldNotReceive('setAuthConfig');
+            $client->shouldReceive('setClientId')->once();
+            $client->shouldReceive('setClientSecret')->once();
+            if ($failure === 'exception') {
+                $client->shouldReceive('fetchAccessTokenWithRefreshToken')->once()->andThrow(new \RuntimeException('DNS timeout'));
+            } else {
+                $client->shouldReceive('fetchAccessTokenWithRefreshToken')->once()->andReturn(['error' => 'invalid_grant']);
+            }
+            $service = new class($client) extends GoogleDriveService
+            {
+                public function __construct(private GoogleClient $testClient)
+                {
+                    parent::__construct();
+                }
+
+                protected function createClient(): GoogleClient
+                {
+                    return $this->testClient;
+                }
+            };
+            $this->assertFalse($service->isConfigured());
+            $this->assertFalse($service->isConfigured());
+        }
+    }
+
     public function test_constructor_does_not_initialize_google_client(): void
     {
         $service = new class extends GoogleDriveService

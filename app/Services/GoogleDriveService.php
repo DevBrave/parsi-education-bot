@@ -37,10 +37,14 @@ class GoogleDriveService
         $refreshToken = config('google.refresh_token');
 
         // 1. OAuth 2.0 (for personal Gmail accounts)
-        if ($clientId && $clientSecret && $refreshToken) {
+        if ($clientId || $clientSecret || $refreshToken) {
+            if (! $clientId || ! $clientSecret || ! $refreshToken) {
+                bot_log('drive')->error('Google Drive OAuth configuration is incomplete. Service account fallback disabled; complete the OAuth settings to resume Drive uploads.');
+
+                return;
+            }
             try {
-                $client = new GoogleClient;
-                $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
+                $client = $this->createClient();
                 $client->setClientId($clientId);
                 $client->setClientSecret($clientSecret);
                 $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
@@ -56,14 +60,17 @@ class GoogleDriveService
             } catch (\Throwable $e) {
                 bot_log('drive')->error('Failed to initialize Google Drive OAuth client: '.$e->getMessage());
             }
+
+            bot_log('drive')->warning('Google Drive OAuth unavailable. Service account fallback disabled; Drive uploads remain unsynced until OAuth succeeds.');
+
+            return;
         }
 
-        // 2. Service Account fallback (for Workspace Shared Drives)
+        // Service accounts are used only when no OAuth settings are supplied.
         $credentialsPath = config('google.service_account_json');
         if ($credentialsPath && file_exists($credentialsPath)) {
             try {
-                $client = new GoogleClient;
-                $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
+                $client = $this->createClient();
                 $client->setAuthConfig($credentialsPath);
                 $client->addScope(GoogleDrive::DRIVE);
                 $this->client = $client;
@@ -72,6 +79,14 @@ class GoogleDriveService
                 bot_log('drive')->error('Failed to initialize Google Drive client: '.$e->getMessage());
             }
         }
+    }
+
+    protected function createClient(): GoogleClient
+    {
+        $client = new GoogleClient;
+        $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
+
+        return $client;
     }
 
     /**
