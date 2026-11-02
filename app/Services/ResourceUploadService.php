@@ -91,16 +91,19 @@ class ResourceUploadService
 
             if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
                 try {
-                    $courseName = $resourceFile->resource?->course?->name;
-                    $folderId = $courseName
-                        ? $this->googleDriveService->getOrCreateFolder($courseName)
+                    $courseName = $resourceFile->resource?->course?->name ?? 'General';
+                    $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
+                    // 1. Find or create the Course folder (e.g., "Algorithms")
+                    $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
+                    // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
+                    $targetFolderId = $courseFolderId
+                        ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
                         : null;
-
                     $driveFileId = $this->googleDriveService->uploadFile(
                         filePath: $fullPath,
                         filename: $resourceFile->original_filename,
                         mimeType: $resourceFile->mime_type,
-                        folderId: $folderId,
+                        folderId: $targetFolderId,
                     );
                 } catch (\Throwable $driveError) {
                     bot_log('drive')->warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");

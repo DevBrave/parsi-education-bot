@@ -266,7 +266,23 @@
                     submitBtn.innerText = '🚀 Upload & Sync to Telegram';
                     progressBar.style.background = '#ef4444';
                     progressText.innerText = 'Upload failed';
-                    noticeText.innerText = '❌ Error ' + xhr.status + ': Server upload failed. Check server maximum upload limits.';
+
+                    let errorMsg = '❌ Error ' + xhr.status + ': Server upload failed.';
+                    try {
+                        const json = JSON.parse(xhr.responseText);
+                        if (json.errors) {
+                            errorMsg = '❌ ' + Object.values(json.errors).flat().join(' | ');
+                        } else if (json.message) {
+                            errorMsg = '❌ ' + json.message;
+                        }
+                    } catch (e) {
+                        if (xhr.status === 413) {
+                            errorMsg = '❌ Error 413: Request too large. Check client_max_body_size and upload_max_filesize.';
+                        } else if (xhr.status === 419) {
+                            errorMsg = '❌ Error 419: Page session expired. Please refresh the page and try again.';
+                        }
+                    }
+                    noticeText.innerText = errorMsg;
                 }
             };
 
