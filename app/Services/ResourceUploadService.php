@@ -145,10 +145,12 @@ class ResourceUploadService
             if (! $hasTgFile && $driveFileId && ! $telegramMessageId && $storageChannelId) {
                 try {
                     $driveUrl = "https://drive.google.com/file/d/{$driveFileId}/view";
+                    $lang = $submitter?->preferred_language ?? 'en';
+                    $downloadLabel = __('bot.resources.download_drive', [], $lang);
                     $linkResponse = $this->telegramService->sendMessage(
                         $storageChannelId,
-                        $formattedCaption."\n\n📥 <a href=\"{$driveUrl}\">Download from Google Drive</a>",
-                        ['inline_keyboard' => [[['text' => '📥 Download from Google Drive', 'url' => $driveUrl]]]],
+                        $formattedCaption."\n\n<a href=\"{$driveUrl}\">".e($downloadLabel).'</a>',
+                        ['inline_keyboard' => [[['text' => $downloadLabel, 'url' => $driveUrl]]]],
                     );
                     if ($linkResponse->json('ok')) {
                         $telegramMessageId = $linkResponse->json('result.message_id');
