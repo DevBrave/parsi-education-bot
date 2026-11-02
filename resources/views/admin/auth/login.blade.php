@@ -175,7 +175,7 @@
                     value="{{ old('email') }}" 
                     required 
                     autofocus 
-                    placeholder="admin@parsi.polito.it or devbravee"
+                    placeholder="ٍEmail or username"
                     autocomplete="username"
                 >
             </div>
@@ -205,7 +205,7 @@
         </form>
 
         <div class="login-footer">
-            🔒 Protected by Politecnico di Torino PARSI Educational Committee
+            🔒 Protected by PARSI Polito Educational Committee (DevBrave)
         </div>
 
     </div>
