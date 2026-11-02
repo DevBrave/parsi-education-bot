@@ -591,75 +591,90 @@ class ResourceAdminController extends Controller
         }
 
         @set_time_limit(0);
-        @ini_set('max_execution_time', '600');
+        @ini_set('max_execution_time', '1800');
+        @ini_set('memory_limit', '1024M');
 
         if (! $driveService->isConfigured()) {
-            return back()->with('error', 'Google Drive service is not configured on this server.');
+            return back()->with('error', 'Google Drive service is not configured or token is invalid on this server.');
         }
 
-        $courseName = $resource->course?->name ?? 'General';
-        $typeName = $resource->resourceType?->display_name ?? 'Notes';
+        try {
+            $courseName = $resource->course?->name ?? 'General';
+            $typeName = $resource->resourceType?->display_name ?? 'Notes';
 
-        $courseFolderId = $driveService->getOrCreateFolder($courseName);
-        $targetFolderId = $driveService->getOrCreateFolder($typeName, $courseFolderId);
+            $courseFolderId = $driveService->getOrCreateFolder($courseName);
+            $targetFolderId = $driveService->getOrCreateFolder($typeName, $courseFolderId);
 
-        $syncedCount = 0;
-        $failedCount = 0;
+            $syncedCount = 0;
+            $failedCount = 0;
 
-        foreach ($resource->files as $file) {
-            if ($file->drive_file_id) {
-                continue;
-            }
+            foreach ($resource->files as $file) {
+                if ($file->drive_file_id) {
+                    continue;
+                }
 
-            $tempPath = null;
-            $sourcePath = null;
+                $tempPath = null;
+                $sourcePath = null;
 
-            if ($file->local_path && Storage::disk('local')->exists($file->local_path)) {
-                $sourcePath = Storage::disk('local')->path($file->local_path);
-            } elseif ($file->telegram_file_id) {
-                $tgFile = $telegram->getFile($file->telegram_file_id);
-                if ($tgFile && isset($tgFile['file_path'])) {
-                    $downloadUrl = $telegram->getFileDownloadUrl($tgFile['file_path']);
-                    $response = Http::timeout(60)->get($downloadUrl);
-                    if ($response->successful()) {
-                        $tempPath = tempnam(sys_get_temp_dir(), 'parsi_sync_');
-                        file_put_contents($tempPath, $response->body());
-                        $sourcePath = $tempPath;
+                try {
+                    if ($file->local_path && Storage::disk('local')->exists($file->local_path)) {
+                        $sourcePath = Storage::disk('local')->path($file->local_path);
+                    } elseif ($file->telegram_file_id) {
+                        $tgFile = $telegram->getFile($file->telegram_file_id);
+                        if ($tgFile && isset($tgFile['file_path'])) {
+                            $downloadUrl = $telegram->getFileDownloadUrl($tgFile['file_path']);
+                            $tempPath = tempnam(sys_get_temp_dir(), 'parsi_sync_');
+                            // Stream directly to file to prevent memory exhaustion on large files
+                            $response = Http::timeout(600)->sink($tempPath)->get($downloadUrl);
+                            if ($response->successful() && file_exists($tempPath) && filesize($tempPath) > 0) {
+                                $sourcePath = $tempPath;
+                            } else {
+                                @unlink($tempPath);
+                                $tempPath = null;
+                            }
+                        }
+                    }
+
+                    if ($sourcePath && file_exists($sourcePath)) {
+                        $mime = $file->mime_type ?? 'application/pdf';
+                        $driveId = $driveService->uploadFile($sourcePath, $file->original_filename, $mime, $targetFolderId);
+                        if ($driveId) {
+                            $file->update(['drive_file_id' => $driveId]);
+                            $syncedCount++;
+                        } else {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                } catch (\Throwable $fileEx) {
+                    bot_log('drive')->error("Failed syncing file {$file->id} to Google Drive: " . $fileEx->getMessage());
+                    $failedCount++;
+                } finally {
+                    if ($tempPath && file_exists($tempPath)) {
+                        @unlink($tempPath);
                     }
                 }
             }
 
-            if ($sourcePath && file_exists($sourcePath)) {
-                $mime = $file->mime_type ?? 'application/pdf';
-                $driveId = $driveService->uploadFile($sourcePath, $file->original_filename, $mime, $targetFolderId);
-                if ($driveId) {
-                    $file->update(['drive_file_id' => $driveId]);
-                    $syncedCount++;
-                } else {
-                    $failedCount++;
-                }
-            } else {
-                $failedCount++;
+            log_rbac("Resource #{$resource->id} ('{$resource->title}') manual Drive sync: {$syncedCount} synced, {$failedCount} failed", $user, [
+                'resource_id' => $resource->id,
+                'synced' => $syncedCount,
+                'failed' => $failedCount,
+            ]);
+
+            if ($syncedCount > 0) {
+                return redirect()->route('admin.resources.edit', $resource)->with('success', "{$syncedCount} file(s) successfully synced to Google Drive!");
+            } elseif ($failedCount > 0) {
+                return redirect()->route('admin.resources.edit', $resource)->with('error', "Could not sync {$failedCount} file(s) to Google Drive. Check drive logs for details.");
             }
 
-            if ($tempPath && file_exists($tempPath)) {
-                @unlink($tempPath);
-            }
+            return redirect()->route('admin.resources.edit', $resource)->with('info', 'All files for this resource are already synced to Google Drive.');
+        } catch (\Throwable $e) {
+            bot_log('drive')->error("Manual Drive sync error on Resource #{$resource->id}: " . $e->getMessage());
+
+            return redirect()->route('admin.resources.edit', $resource)->with('error', 'Google Drive sync failed: ' . $e->getMessage());
         }
-
-        log_rbac("Resource #{$resource->id} ('{$resource->title}') manual Drive sync: {$syncedCount} synced, {$failedCount} failed", $user, [
-            'resource_id' => $resource->id,
-            'synced' => $syncedCount,
-            'failed' => $failedCount,
-        ]);
-
-        if ($syncedCount > 0) {
-            return back()->with('success', "{$syncedCount} file(s) successfully synced to Google Drive!");
-        } elseif ($failedCount > 0) {
-            return back()->with('error', "Could not sync {$failedCount} file(s) to Google Drive. Check drive logs for details.");
-        }
-
-        return back()->with('info', 'All files for this resource are already synced to Google Drive.');
     }
 }
 

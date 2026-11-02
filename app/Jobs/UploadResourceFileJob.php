@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\ResourceFile;
 use App\Services\ResourceUploadService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -12,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class UploadResourceFileJob implements ShouldQueue
+class UploadResourceFileJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -23,6 +24,17 @@ class UploadResourceFileJob implements ShouldQueue
     public int $timeout = 1800;
 
     /**
+     * The number of times the job may be attempted.
+     * Must be 1 to prevent duplicate uploads to Telegram and Google Drive.
+     */
+    public int $tries = 1;
+
+    /**
+     * The maximum number of unhandled exceptions to allow before failing.
+     */
+    public int $maxExceptions = 1;
+
+    /**
      * Create a new job instance.
      */
     public function __construct(
@@ -30,6 +42,14 @@ class UploadResourceFileJob implements ShouldQueue
         public string $storedPath,
         public string $caption = ''
     ) {}
+
+    /**
+     * The unique ID of the job (prevents duplicate dispatch for the same file).
+     */
+    public function uniqueId(): string
+    {
+        return 'upload_resource_file_' . $this->resourceFile->id;
+    }
 
     /**
      * Execute the job.

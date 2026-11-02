@@ -64,30 +64,35 @@ class ResourceUploadService
             $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
             $tgResult = null;
 
+            // Refresh model to check if an earlier worker or manual sync already uploaded to Telegram
+            $freshFile = $resourceFile->fresh() ?? $resourceFile;
+            $hasTgFile = ! empty($freshFile->telegram_file_id);
+
             $maxTelegramUploadBytes = ((int) config('telegram.max_upload_size_mb', 50)) * 1024 * 1024;
 
-            // Telegram Bot API has a 50MB limit on https://api.telegram.org,
-            // or up to 2000MB (2GB) when using a Local Telegram Bot API Server.
-            if ($fileSizeBytes > 0 && $fileSizeBytes <= $maxTelegramUploadBytes) {
-                $tgResult = $this->telegramService->uploadDocument(
-                    chatId: $storageChannelId,
-                    filePath: $fullPath,
-                    filename: $resourceFile->original_filename,
-                    caption: $formattedCaption,
-                );
-            } else {
-                $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
-                bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
+            // Only upload to Telegram if not already uploaded
+            if (! $hasTgFile) {
+                if ($fileSizeBytes > 0 && $fileSizeBytes <= $maxTelegramUploadBytes) {
+                    $tgResult = $this->telegramService->uploadDocument(
+                        chatId: $storageChannelId,
+                        filePath: $fullPath,
+                        filename: $resourceFile->original_filename,
+                        caption: $formattedCaption,
+                    );
+                    $hasTgFile = ! empty($tgResult['file_id']);
+                } else {
+                    $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
+                    bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
+                }
             }
 
-            $hasTgFile = ! empty($tgResult['file_id']);
             if (! $hasTgFile) {
                 bot_log('telegram')->warning("Telegram upload omitted or failed for ResourceFile #{$resourceFile->id}, proceeding to Google Drive fallback.");
             }
 
             // 2. Upload to Google Drive (only if approved and not already synced)
             $isApproved = ($resourceFile->resource?->status === 'approved');
-            $driveFileId = $resourceFile->drive_file_id;
+            $driveFileId = ($resourceFile->fresh() ?? $resourceFile)->drive_file_id;
 
             if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
                 try {

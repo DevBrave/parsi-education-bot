@@ -39,7 +39,7 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::get('/resources/{resource}/edit', [ResourceAdminController::class, 'edit'])->name('admin.resources.edit');
     Route::put('/resources/{resource}', [ResourceAdminController::class, 'update'])->name('admin.resources.update');
     Route::get('/resources/{resource}/files/{file}/download', [ResourceAdminController::class, 'downloadFile'])->name('admin.resources.download');
-    Route::post('/resources/{resource}/sync-drive', [ResourceAdminController::class, 'syncDrive'])->name('admin.resources.sync-drive');
+    Route::match(['get', 'post'], '/resources/{resource}/sync-drive', [ResourceAdminController::class, 'syncDrive'])->name('admin.resources.sync-drive');
     Route::delete('/resources/{resource}/files/{file}', [ResourceAdminController::class, 'destroyFile'])->name('admin.resources.files.destroy');
     Route::delete('/resources/{resource}', [ResourceAdminController::class, 'destroy'])->name('admin.resources.destroy');
 
