@@ -891,7 +891,7 @@ class ProgramMenuKeyboard
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'report_prompt'],
+                    ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'contact_prompt'],
                 ],
                 [
                     ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
