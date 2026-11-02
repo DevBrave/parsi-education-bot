@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\ResourceFile;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -51,14 +50,14 @@ class ResourceUploadService
                 $submitterName = "ID: {$submitter->telegram_user_id}";
             }
 
-            $formattedCaption = "📚 <b>" . e($courseName) . "</b>";
+            $formattedCaption = '📚 <b>'.e($courseName).'</b>';
             if (! empty($cleanTitle)) {
-                $formattedCaption .= "\n📌 <b>" . e($cleanTitle) . "</b>";
+                $formattedCaption .= "\n📌 <b>".e($cleanTitle).'</b>';
             }
-            $formattedCaption .= "\n📄 " . e($resourceFile->original_filename);
-            $formattedCaption .= "\n🏷️ <b>Category:</b> " . e($categoryName);
+            $formattedCaption .= "\n📄 ".e($resourceFile->original_filename);
+            $formattedCaption .= "\n🏷️ <b>Category:</b> ".e($categoryName);
             if (! empty($submitterName)) {
-                $formattedCaption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
+                $formattedCaption .= "\n👤 <b>Sent by:</b> ".e($submitterName);
             }
 
             $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
@@ -94,25 +93,36 @@ class ResourceUploadService
             $isApproved = ($resourceFile->resource?->status === 'approved');
             $driveFileId = ($resourceFile->fresh() ?? $resourceFile)->drive_file_id;
 
-            if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
-                try {
-                    $courseName = $resourceFile->resource?->course?->name ?? 'General';
-                    $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
-                    // 1. Find or create the Course folder (e.g., "Algorithms")
-                    $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
-                    // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
-                    $targetFolderId = $courseFolderId
-                        ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
-                        : null;
-                    $driveFileId = $this->googleDriveService->uploadFile(
-                        filePath: $fullPath,
-                        filename: $resourceFile->original_filename,
-                        mimeType: $resourceFile->mime_type,
-                        folderId: $targetFolderId,
-                    );
-                } catch (\Throwable $driveError) {
-                    bot_log('drive')->warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
+            $driveStarted = microtime(true);
+            bot_log('drive')->info('Resource Drive stage started', ['resource_file_id' => $resourceFile->id]);
+            try {
+                if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
+                    try {
+                        $courseName = $resourceFile->resource?->course?->name ?? 'General';
+                        $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
+                        // 1. Find or create the Course folder (e.g., "Algorithms")
+                        $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
+                        // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
+                        $targetFolderId = $courseFolderId
+                            ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
+                            : null;
+                        $driveFileId = $this->googleDriveService->uploadFile(
+                            filePath: $fullPath,
+                            filename: $resourceFile->original_filename,
+                            mimeType: $resourceFile->mime_type,
+                            folderId: $targetFolderId,
+                        );
+                    } catch (\Throwable $driveError) {
+                        bot_log('drive')->warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
+                    }
                 }
+
+            } finally {
+                bot_log('drive')->info('Resource Drive stage finished', [
+                    'resource_file_id' => $resourceFile->id,
+                    'duration_ms' => (int) ((microtime(true) - $driveStarted) * 1000),
+                    'uploaded' => ! empty($driveFileId),
+                ]);
             }
 
             // If neither Telegram nor Google Drive received the file, mark rejected and abort
@@ -126,9 +136,9 @@ class ResourceUploadService
 
             // 3. Update ResourceFile with external IDs and clear local path
             $resourceFile->update([
-                'telegram_file_id' => $tgResult['file_id'] ?? null,
-                'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
-                'telegram_message_id' => $tgResult['message_id'] ?? null,
+                'telegram_file_id' => $tgResult['file_id'] ?? $freshFile->telegram_file_id,
+                'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? $freshFile->telegram_file_unique_id,
+                'telegram_message_id' => $tgResult['message_id'] ?? $freshFile->telegram_message_id,
                 'drive_file_id' => $driveFileId,
                 'local_path' => null,
             ]);
@@ -136,7 +146,7 @@ class ResourceUploadService
             // 4. Remove temporary file from local VPS disk to conserve storage
             Storage::disk('local')->delete($storedPath);
 
-            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: " . ($hasTgFile ? "yes" : "no") . ", Drive: " . ($driveFileId ? "yes" : "no") . ").");
+            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: ".($hasTgFile ? 'yes' : 'no').', Drive: '.($driveFileId ? 'yes' : 'no').').');
 
             return true;
         } catch (\Throwable $e) {

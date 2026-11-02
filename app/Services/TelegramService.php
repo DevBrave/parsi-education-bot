@@ -246,18 +246,29 @@ class TelegramService
 
         if (! file_exists($filePath)) {
             bot_log('telegram')->error("uploadDocument file not found: {$filePath}");
+
             return null;
         }
 
         $stream = fopen($filePath, 'r');
         if (! $stream) {
             bot_log('telegram')->error("uploadDocument failed to open file stream: {$filePath}");
+
             return null;
         }
 
+        $started = microtime(true);
+        $size = filesize($filePath);
+        $timeout = max(1, (int) config(
+            $size <= 5 * 1024 * 1024 ? 'telegram.small_upload_timeout' : 'telegram.upload_timeout',
+            $size <= 5 * 1024 * 1024 ? 60 : 300,
+        ));
+        bot_log('telegram')->info('Telegram document upload started', [
+            'filename' => $filename, 'size_bytes' => $size, 'timeout_seconds' => $timeout,
+        ]);
+
         try {
-            // 1200-second timeout for large files (up to 2000MB) over networks or local bot api
-            $response = $this->client(1200, 30)
+            $response = $this->client($timeout, max(1, (int) config('telegram.upload_connect_timeout', 10)))
                 ->attach('document', $stream, $filename)
                 ->post("{$this->baseUrl}/sendDocument", $payload);
 
@@ -285,6 +296,10 @@ class TelegramService
 
             return null;
         } finally {
+            bot_log('telegram')->info('Telegram document upload finished', [
+                'filename' => $filename,
+                'duration_ms' => (int) ((microtime(true) - $started) * 1000),
+            ]);
             if (is_resource($stream)) {
                 fclose($stream);
             }
@@ -364,9 +379,7 @@ class TelegramService
     /**
      * Send a group of photos or documents as an album (sendMediaGroup).
      *
-     * @param int|string $chatId
-     * @param array $media Array of InputMedia items (2 to 10 items)
-     * @return Response
+     * @param  array  $media  Array of InputMedia items (2 to 10 items)
      */
     public function sendMediaGroup(int|string $chatId, array $media): Response
     {
@@ -431,7 +444,7 @@ class TelegramService
             'chat_id' => $chatId,
             'message_id' => $messageId,
         ]);
-        
+
         if (! $response->json('ok')) {
             $this->log('warning', 'Telegram deleteMessage failed', [
                 'chat_id' => $chatId,

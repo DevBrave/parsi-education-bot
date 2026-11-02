@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Google\Client as GoogleClient;
+use Google\Http\MediaFileUpload;
 use Google\Service\Drive as GoogleDrive;
 use Google\Service\Drive\DriveFile;
 use Google\Service\Drive\Permission;
@@ -16,9 +17,19 @@ class GoogleDriveService
 
     protected ?string $folderId = null;
 
+    protected bool $initialized = false;
+
     public function __construct()
     {
         $this->folderId = config('google.folder_id') ?: null;
+    }
+
+    protected function initialize(): void
+    {
+        if ($this->initialized) {
+            return;
+        }
+        $this->initialized = true;
 
         $clientId = config('google.client_id');
         $clientSecret = config('google.client_secret');
@@ -33,7 +44,7 @@ class GoogleDriveService
                 $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
 
                 if (! empty($token['error'])) {
-                    bot_log('drive')->warning('Google Drive refresh token invalid or expired: ' . ($token['error_description'] ?? $token['error']));
+                    bot_log('drive')->warning('Google Drive refresh token invalid or expired: '.($token['error_description'] ?? $token['error']));
                 } else {
                     $this->client = $client;
                     $this->driveService = new GoogleDrive($client);
@@ -65,6 +76,18 @@ class GoogleDriveService
      */
     public function isConfigured(): bool
     {
+        $started = microtime(true);
+        if (! $this->initialized) {
+            try {
+                $this->initialize();
+            } finally {
+                bot_log('drive')->info('Google Drive initialization finished', [
+                    'duration_ms' => (int) ((microtime(true) - $started) * 1000),
+                    'configured' => $this->driveService !== null && $this->client !== null,
+                ]);
+            }
+        }
+
         return $this->driveService !== null && $this->client !== null;
     }
 
@@ -72,7 +95,6 @@ class GoogleDriveService
      * Find or create a subfolder by name inside a parent folder.
      * Useful for automatically organizing files by Course.
      */
-    
     public function getOrCreateFolder(string $folderName, ?string $parentFolderId = null): ?string
     {
         if (! $this->isConfigured()) {
@@ -180,7 +202,7 @@ class GoogleDriveService
                     );
 
                     $chunkSizeBytes = 2 * 1024 * 1024; // 2MB chunk (must be multiple of 256KB)
-                    $media = new \Google\Http\MediaFileUpload(
+                    $media = new MediaFileUpload(
                         $this->client,
                         $request,
                         $mimeType,

@@ -10,10 +10,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class UploadResourceFileJob implements ShouldQueue, ShouldBeUnique
+class UploadResourceFileJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -34,6 +33,8 @@ class UploadResourceFileJob implements ShouldQueue, ShouldBeUnique
      */
     public int $maxExceptions = 1;
 
+    public ?float $queuedAt = null;
+
     /**
      * Create a new job instance.
      */
@@ -41,14 +42,16 @@ class UploadResourceFileJob implements ShouldQueue, ShouldBeUnique
         public ResourceFile $resourceFile,
         public string $storedPath,
         public string $caption = ''
-    ) {}
+    ) {
+        $this->queuedAt = microtime(true);
+    }
 
     /**
      * The unique ID of the job (prevents duplicate dispatch for the same file).
      */
     public function uniqueId(): string
     {
-        return 'upload_resource_file_' . $this->resourceFile->id;
+        return 'upload_resource_file_'.$this->resourceFile->id;
     }
 
     /**
@@ -56,7 +59,19 @@ class UploadResourceFileJob implements ShouldQueue, ShouldBeUnique
      */
     public function handle(ResourceUploadService $uploadService): void
     {
-        $uploadService->sync($this->resourceFile, $this->storedPath, $this->caption);
+        $started = microtime(true);
+        bot_log('telegram')->info('Resource upload job started', [
+            'resource_file_id' => $this->resourceFile->id,
+            'queue_wait_ms' => $this->queuedAt !== null ? (int) (($started - $this->queuedAt) * 1000) : null,
+        ]);
+        try {
+            $uploadService->sync($this->resourceFile, $this->storedPath, $this->caption);
+        } finally {
+            bot_log('telegram')->info('Resource upload job finished', [
+                'resource_file_id' => $this->resourceFile->id,
+                'duration_ms' => (int) ((microtime(true) - $started) * 1000),
+            ]);
+        }
     }
 
     /**

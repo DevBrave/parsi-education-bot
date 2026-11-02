@@ -18,9 +18,15 @@ return [
 
     'max_upload_size_mb' => (int) env('TELEGRAM_MAX_UPLOAD_SIZE_MB', 50),
 
+    'small_upload_timeout' => (int) env('TELEGRAM_SMALL_UPLOAD_TIMEOUT', 60),
+
+    'upload_timeout' => (int) env('TELEGRAM_UPLOAD_TIMEOUT', 300),
+
+    'upload_connect_timeout' => (int) env('TELEGRAM_UPLOAD_CONNECT_TIMEOUT', 10),
+
     'channel_username' => env('TELEGRAM_CHANNEL_USERNAME', 'PARSI_POLITO'),
 
-    'instagram_link' => env('INSTAGRAM_PAGE_LINK','https://www.instagram.com/parsi___polito/'),
+    'instagram_link' => env('INSTAGRAM_PAGE_LINK', 'https://www.instagram.com/parsi___polito/'),
 
     'bot_username' => env('TELEGRAM_BOT_USERNAME', 'parsi_politobot'),
 
