@@ -117,10 +117,10 @@
         <div class="form-group">
             <label>Attach Files * (Select one or more)</label>
             <div class="file-dropzone" id="dropzone">
-                <input type="file" name="files[]" id="file" multiple required onchange="updateFileName(this)">
+                <input type="file" name="files[]" id="file" multiple required accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.zip,.rar,.7z,.tar,.gz,.jpg,.jpeg,.png,.webp,.heic" onchange="updateFileName(this)">
                 <div class="icon">📁</div>
                 <div class="title" id="file-label">Click or Drag & Drop File(s) Here</div>
-                <div class="sub">Supports PDF, ZIP, DOCX, PPTX (up to 500MB per file)</div>
+                <div class="sub">Supports PDF, Office Docs (DOCX, PPTX, XLSX), Archives (ZIP, RAR, 7Z), Images, TXT (up to 500MB per file)</div>
             </div>
             @error('files') <span class="error-msg">{{ $message }}</span> @enderror
             @error('files.*') <span class="error-msg">{{ $message }}</span> @enderror

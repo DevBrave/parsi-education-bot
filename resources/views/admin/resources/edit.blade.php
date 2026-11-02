@@ -284,11 +284,11 @@
                     ➕ Add New / Replacement Files (Optional)
                 </label>
                 <div class="file-dropzone" id="dropzone" style="margin-top: 0.5rem; background: #ffffff; position: relative;">
-                    <input type="file" name="files[]" id="files" multiple accept=".pdf,.zip,.docx,.pptx" onchange="updateFileNames(this)" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                    <input type="file" name="files[]" id="files" multiple accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.zip,.rar,.7z,.tar,.gz,.jpg,.jpeg,.png,.webp,.heic" onchange="updateFileNames(this)" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
                     <div class="icon" style="font-size: 1.75rem; margin-bottom: 0.35rem;">📁</div>
                     <div class="title" id="file-label" style="font-size: 0.9rem; font-weight: 600; color: var(--text-main);">Click or Drag & Drop File(s) Here to Attach</div>
                     <div class="sub" style="font-size: 0.775rem; color: var(--text-muted); margin-top: 0.25rem;">
-                        Supports PDF, ZIP, DOCX, PPTX (up to 500MB per file). Newly added files will automatically sync to Telegram and Google Drive.
+                        Supports PDF, Office Docs (DOCX, PPTX, XLSX), Archives (ZIP, RAR, 7Z), Images, TXT (up to 500MB per file). Newly added files will automatically sync to Telegram and Google Drive.
                     </div>
                 </div>
                 @error('files') <span class="error-msg">{{ $message }}</span> @enderror

@@ -7,7 +7,7 @@ class FileSecurityService
     /**
      * Allowed educational file extensions (Whitelist).
      */
-    protected const ALLOWED_EXTENSIONS = [
+    public const ALLOWED_EXTENSIONS = [
         // Documents
         'pdf', 'doc', 'docx', 'odt', 'rtf', 'txt',
         // Presentations
@@ -19,6 +19,14 @@ class FileSecurityService
         // Images
         'jpg', 'jpeg', 'png', 'webp', 'heic',
     ];
+
+    /**
+     * Get comma-separated list of allowed extensions for Laravel validation.
+     */
+    public static function allowedMimesString(): string
+    {
+        return implode(',', self::ALLOWED_EXTENSIONS);
+    }
 
     /**
      * Dangerous executable and script extensions (Hard Blacklist).
