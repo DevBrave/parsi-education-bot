@@ -141,10 +141,28 @@ class ResourceUploadService
             }
 
             // 3. Update ResourceFile with external IDs and clear local path
+            $telegramMessageId = $tgResult['message_id'] ?? $freshFile->telegram_message_id;
+            if (! $hasTgFile && $driveFileId && ! $telegramMessageId && $storageChannelId) {
+                try {
+                    $driveUrl = "https://drive.google.com/file/d/{$driveFileId}/view";
+                    $linkResponse = $this->telegramService->sendMessage(
+                        $storageChannelId,
+                        $formattedCaption."\n\n📥 <a href=\"{$driveUrl}\">Download from Google Drive</a>",
+                        ['inline_keyboard' => [[['text' => '📥 Download from Google Drive', 'url' => $driveUrl]]]],
+                    );
+                    if ($linkResponse->json('ok')) {
+                        $telegramMessageId = $linkResponse->json('result.message_id');
+                    } else {
+                        bot_log('telegram')->warning('Drive link message rejected', ['resource_file_id' => $resourceFile->id]);
+                    }
+                } catch (\Throwable $exception) {
+                    bot_log('telegram')->warning('Drive link message failed', ['resource_file_id' => $resourceFile->id]);
+                }
+            }
             $resourceFile->update([
                 'telegram_file_id' => $tgResult['file_id'] ?? $freshFile->telegram_file_id,
                 'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? $freshFile->telegram_file_unique_id,
-                'telegram_message_id' => $tgResult['message_id'] ?? $freshFile->telegram_message_id,
+                'telegram_message_id' => $telegramMessageId,
                 'drive_file_id' => $driveFileId,
                 'local_path' => $driveFileId ? null : $storedPath,
             ]);

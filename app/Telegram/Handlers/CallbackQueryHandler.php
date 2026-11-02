@@ -855,8 +855,7 @@ class CallbackQueryHandler
         // 2. Solution 2: Direct Google Drive link button when telegram_file_id is missing or failed
         if ($driveFiles->isNotEmpty()) {
             $resource->increment('downloads_count');
-            $fullCaption = $baseCaption . $socialFooter;
-            $this->sendGoogleDriveDownloadOption($chatId, $resource, $driveFiles, $programId, $lang, $fullCaption);
+            $this->sendGoogleDriveDownloadOption($chatId, $resource, $driveFiles, $programId, $lang, $fileCaption);
 
             return;
         }
