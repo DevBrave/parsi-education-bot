@@ -12,10 +12,14 @@ use Illuminate\Support\Facades\Storage;
  */
 class ResourceUploadService
 {
+    protected string $storageChannelId;
+
     public function __construct(
         protected TelegramService $telegramService,
         protected GoogleDriveService $googleDriveService,
-    ) {}
+    ) {
+        $this->storageChannelId = (string) config('telegram.storage_channel_id', '');
+    }
 
     /**
      * Process background upload for an already stored file and update database records.
@@ -35,95 +39,33 @@ class ResourceUploadService
         }
 
         try {
-            $storageChannelId = config('telegram.storage_channel_id');
-            $courseName = $resourceFile->resource?->course?->name ?? 'Course Material';
-            $categoryName = $resourceFile->resource?->resourceType?->display_name ?? 'Material';
-            $title = $caption ?: ($resourceFile->resource?->title ?? '');
-            $cleanTitle = trim(preg_replace('/^📚\s*/u', '', $title));
+            $resource = $resourceFile->resource;
+            if (! $resource) {
+                bot_log('telegram')->error('Cannot sync a file without its resource', ['resource_file_id' => $resourceFile->id]);
 
-            $submitter = $resourceFile->resource?->submitter;
-            $submitterName = $submitter?->username
-                ? "@{$submitter->username}"
-                : trim("{$submitter?->first_name} {$submitter?->last_name}");
-            if (empty($submitterName) && $submitter?->telegram_user_id) {
-                $submitterName = "ID: {$submitter->telegram_user_id}";
+                return false;
             }
+            $formattedCaption = $resource->buildTelegramCaptionForAdminChannel($resourceFile, $caption);
+            $tgResult = $this->uploadToTelegram($resourceFile, $fullPath, $formattedCaption);
 
-            $formattedCaption = '📚 <b>'.e($courseName).'</b>';
-            if (! empty($cleanTitle)) {
-                $formattedCaption .= "\n📌 <b>".e($cleanTitle).'</b>';
-            }
-            $formattedCaption .= "\n📄 ".e($resourceFile->original_filename);
-            $formattedCaption .= "\n🏷️ <b>Category:</b> ".e($categoryName);
-            if (! empty($submitterName)) {
-                $formattedCaption .= "\n👤 <b>Sent by:</b> ".e($submitterName);
-            }
-
-            $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
-            $tgResult = null;
-
-            // Refresh model to check if an earlier worker or manual sync already uploaded to Telegram
             $freshFile = $resourceFile->fresh() ?? $resourceFile;
             $hasTgFile = ! empty($freshFile->telegram_file_id);
-
-            $maxTelegramUploadBytes = ((int) config('telegram.max_upload_size_mb', 50)) * 1024 * 1024;
-
-            // Only upload to Telegram if not already uploaded
-            if (! $hasTgFile) {
-                if ($fileSizeBytes > 0 && $fileSizeBytes <= $maxTelegramUploadBytes) {
-                    $tgResult = $this->telegramService->uploadDocument(
-                        chatId: $storageChannelId,
-                        filePath: $fullPath,
-                        filename: $resourceFile->original_filename,
-                        caption: $formattedCaption,
-                    );
-                    $hasTgFile = ! empty($tgResult['file_id']);
-                    if ($hasTgFile) {
-                        // Publish Telegram status before potentially slow Drive authentication/upload.
-                        $resourceFile->update([
-                            'telegram_file_id' => $tgResult['file_id'],
-                            'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
-                            'telegram_message_id' => $tgResult['message_id'] ?? null,
-                        ]);
-                    }
-                } else {
-                    $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
-                    bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
-                }
-            }
-
-            if (! $hasTgFile) {
-                bot_log('telegram')->warning("Telegram upload omitted or failed for ResourceFile #{$resourceFile->id}, proceeding to Google Drive fallback.");
-            }
-
             // 2. Upload to Google Drive (only if approved and not already synced)
             $isApproved = ($resourceFile->resource?->status === 'approved');
-            $driveFileId = ($resourceFile->fresh() ?? $resourceFile)->drive_file_id;
+            $driveFileId = $freshFile->drive_file_id;
 
             $driveStarted = microtime(true);
             bot_log('drive')->info('Resource Drive stage started', ['resource_file_id' => $resourceFile->id]);
+
+
             try {
                 if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
                     try {
-                        $courseName = $resourceFile->resource?->course?->name ?? 'General';
-                        $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
-                        // 1. Find or create the Course folder (e.g., "Algorithms")
-                        $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
-                        // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
-                        $targetFolderId = $courseFolderId
-                            ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
-                            : null;
-                        $driveFileId = $this->googleDriveService->uploadFile(
-                            filePath: $fullPath,
-                            filename: $resourceFile->original_filename,
-                            mimeType: $resourceFile->mime_type,
-                            folderId: $targetFolderId,
-                        );
+                        $driveFileId = $this->uploadToGoogleDrive($freshFile, $fullPath);
                     } catch (\Throwable $driveError) {
                         bot_log('drive')->warning("Google Drive backup failed for ResourceFile #{$resourceFile->id}: {$driveError->getMessage()}");
                     }
                 }
-
             } finally {
                 bot_log('drive')->info('Resource Drive stage finished', [
                     'resource_file_id' => $resourceFile->id,
@@ -142,14 +84,15 @@ class ResourceUploadService
 
             // 3. Update ResourceFile with external IDs and clear local path
             $telegramMessageId = $tgResult['message_id'] ?? $freshFile->telegram_message_id;
-            if (! $hasTgFile && $driveFileId && ! $telegramMessageId && $storageChannelId) {
+            if (! $hasTgFile && $driveFileId && ! $telegramMessageId && $this->storageChannelId) {
                 try {
                     $driveUrl = "https://drive.google.com/file/d/{$driveFileId}/view";
-                    $lang = $submitter?->preferred_language ?? 'en';
+                    $lang = $resource->submitter?->preferred_language ?? 'en';
                     $downloadLabel = __('bot.resources.download_drive', [], $lang);
+
                     $linkResponse = $this->telegramService->sendMessage(
-                        $storageChannelId,
-                        $formattedCaption."\n\n<a href=\"{$driveUrl}\">".e($downloadLabel).'</a>',
+                        $this->storageChannelId,
+                        $formattedCaption . "\n\n<a href=\"{$driveUrl}\">" . e($downloadLabel) . '</a>',
                         ['inline_keyboard' => [[['text' => $downloadLabel, 'url' => $driveUrl]]]],
                     );
                     if ($linkResponse->json('ok')) {
@@ -174,7 +117,7 @@ class ResourceUploadService
                 Storage::disk('local')->delete($storedPath);
             }
 
-            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: ".($hasTgFile ? 'yes' : 'no').', Drive: '.($driveFileId ? 'yes' : 'no').').');
+            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: " . ($hasTgFile ? 'yes' : 'no') . ', Drive: ' . ($driveFileId ? 'yes' : 'no') . ').');
 
             return true;
         } catch (\Throwable $e) {
@@ -202,14 +145,27 @@ class ResourceUploadService
 
         try {
             // 2. Upload to Telegram storage channel (primary)
-            $tgResult = $this->uploadToTelegram($file, $fullPath, $caption);
+            $tgResult = $this->storageChannelId
+                ? $this->telegramService->uploadDocument(
+                    chatId: $this->storageChannelId,
+                    filePath: $fullPath,
+                    filename: $file->getClientOriginalName(),
+                    caption: $caption,
+                )
+                : null;
 
             if (! $tgResult || empty($tgResult['file_id'])) {
                 return null;
             }
 
             // 3. Upload to Google Drive (backup/mirror)
-            $driveFileId = $this->uploadToGoogleDrive($file, $fullPath);
+            $driveFileId = $this->googleDriveService->isConfigured()
+                ? $this->googleDriveService->uploadFile(
+                    filePath: $fullPath,
+                    filename: $file->getClientOriginalName(),
+                    mimeType: $file->getClientMimeType(),
+                )
+                : null;
 
             return [
                 'telegram_file_id' => $tgResult['file_id'],
@@ -225,40 +181,68 @@ class ResourceUploadService
     /**
      * Upload file to the Telegram storage channel.
      */
-    protected function uploadToTelegram(UploadedFile $file, string $fullPath, string $caption): ?array
+    protected function uploadToTelegram(ResourceFile $resourceFile, string $fullPath, string $formattedCaption): ?array
     {
-        $storageChannelId = config('telegram.storage_channel_id');
 
-        if (! $storageChannelId || ! file_exists($fullPath)) {
-            return null;
+
+        $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
+        $tgResult = null;
+
+        // Refresh model to check if an earlier worker or manual sync already uploaded to Telegram
+        $freshFile = $resourceFile->fresh() ?? $resourceFile;
+        $hasTgFile = ! empty($freshFile->telegram_file_id);
+
+        $maxTelegramUploadBytes = ((int) config('telegram.max_upload_size_mb', 50)) * 1024 * 1024;
+
+        // Only upload to Telegram if not already uploaded
+        if (! $hasTgFile) {
+            if ($fileSizeBytes > 0 && $fileSizeBytes <= $maxTelegramUploadBytes) {
+                $tgResult = $this->telegramService->uploadDocument(
+                    chatId: $this->storageChannelId,
+                    filePath: $fullPath,
+                    filename: $resourceFile->original_filename,
+                    caption: $formattedCaption,
+                );
+                $hasTgFile = ! empty($tgResult['file_id']);
+                if ($hasTgFile) {
+                    // Publish Telegram status before potentially slow Drive authentication/upload.
+                    $resourceFile->update([
+                        'telegram_file_id' => $tgResult['file_id'],
+                        'telegram_file_unique_id' => $tgResult['file_unique_id'] ?? null,
+                        'telegram_message_id' => $tgResult['message_id'] ?? null,
+                    ]);
+                }
+            } else {
+                $limitMb = round($maxTelegramUploadBytes / (1024 * 1024));
+                bot_log('telegram')->info("ResourceFile #{$resourceFile->id} is {$fileSizeBytes} bytes (>{$limitMb}MB), skipping Telegram Bot API upload and routing directly to Google Drive.");
+            }
         }
 
-        return $this->telegramService->uploadDocument(
-            chatId: $storageChannelId,
-            filePath: $fullPath,
-            filename: $file->getClientOriginalName(),
-            caption: $caption,
-        );
+        if (! $hasTgFile) {
+            bot_log('telegram')->warning("Telegram upload omitted or failed for ResourceFile #{$resourceFile->id}, proceeding to Google Drive fallback.");
+        }
+
+        return $tgResult;
     }
 
     /**
      * Upload file to Google Drive.
      */
-    protected function uploadToGoogleDrive(UploadedFile $file, string $fullPath, ?string $courseName = null): ?string
+    protected function uploadToGoogleDrive(ResourceFile $resourceFile, string $fullPath): ?string
     {
-        if (! $this->googleDriveService->isConfigured() || ! file_exists($fullPath)) {
-            return null;
-        }
-
-        $folderId = $courseName
-            ? $this->googleDriveService->getOrCreateFolder($courseName)
+        $courseName = $resourceFile->resource?->course?->name ?? 'General';
+        $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
+        // 1. Find or create the Course folder (e.g., "Algorithms")
+        $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
+        // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
+        $targetFolderId = $courseFolderId
+            ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
             : null;
-
         return $this->googleDriveService->uploadFile(
             filePath: $fullPath,
-            filename: $file->getClientOriginalName(),
-            mimeType: $file->getClientMimeType(),
-            folderId: $folderId,
+            filename: $resourceFile->original_filename,
+            mimeType: $resourceFile->mime_type,
+            folderId: $targetFolderId,
         );
     }
 }

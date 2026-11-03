@@ -39,7 +39,7 @@ class Resource extends Model
             Cache::forget('admin:dashboard:heavy_metrics');
         };
 
-    
+
         static::deleted($flushSearchCaches);
     }
 
@@ -128,7 +128,7 @@ class Resource extends Model
         if ($hasDescription && ! str_contains($caption, $cleanDesc)) {
             $caption .= "\n" . trim($descBlock);
         }
-        
+
         if ($middleSection !== null && $middleSection !== '') {
             $caption .= "\n\n" . trim($middleSection);
         }
@@ -142,5 +142,34 @@ class Resource extends Model
         ], $lang);
 
         return $caption;
+    }
+
+    public function buildTelegramCaptionForAdminChannel(ResourceFile $resourceFile, ?string $caption = null): string
+    {
+        $courseName = $resourceFile->resource?->course?->name ?? 'Course Material';
+        $categoryName = $resourceFile->resource?->resourceType?->display_name ?? 'Material';
+        $title = $caption ?: ($resourceFile->resource?->title ?? '');
+        $cleanTitle = trim(preg_replace('/^📚\s*/u', '', $title));
+
+        $submitter = $resourceFile->resource?->submitter;
+        $submitterName = $submitter?->username
+            ? "@{$submitter->username}"
+            : trim("{$submitter?->first_name} {$submitter?->last_name}");
+
+        if (empty($submitterName) && $submitter?->telegram_user_id) {
+            $submitterName = "ID: {$submitter->telegram_user_id}";
+        }
+
+        $formattedCaption = '📚 <b>' . e($courseName) . '</b>';
+        if (! empty($cleanTitle)) {
+            $formattedCaption .= "\n📌 <b>" . e($cleanTitle) . '</b>';
+        }
+        $formattedCaption .= "\n📄 " . e($resourceFile->original_filename);
+        $formattedCaption .= "\n🏷️ <b>Category:</b> " . e($categoryName);
+        if (! empty($submitterName)) {
+            $formattedCaption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
+        }
+
+        return $formattedCaption;
     }
 }
