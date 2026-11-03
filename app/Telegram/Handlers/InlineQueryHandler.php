@@ -108,16 +108,11 @@ class InlineQueryHandler
 
             foreach ($resources as $resource) {
                 $courseName = $resource->course?->name ? e($resource->course->name) : 'Course Material';
-                $typeName = $resource->resourceType?->display_name ?? 'Resource';
                 $allFiles = $resource->files;
                 $fileCount = $allFiles->count();
 
                 // Build official PARSI caption using the unified Resource method
                 $caption = $resource->buildTelegramCaption($lang);
-
-                $descSnippet = ! empty($resource->description)
-                    ? mb_strimwidth(trim(strip_tags($resource->description)), 0, 50, '...') . ' • '
-                    : '';
 
                 $getAllUrl = "https://t.me/{$botUsername}?start=res_{$resource->id}";
                 $courseUrl = $resource->course_id ? "https://t.me/{$botUsername}?start=course_{$resource->course_id}" : null;
@@ -149,23 +144,23 @@ class InlineQueryHandler
                         $items[] = [
                             'type' => 'photo',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📄 {$resource->title}",
+                            'title' => "📄 ".($file->original_filename ?: $resource->title),
                             'photo_file_id' => $file->telegram_file_id,
                             'caption' => $caption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$descSnippet}{$courseName} • {$typeName} (1 photo)",
+                            'description' => "{$courseName} (1 file)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     } else {
                         $items[] = [
                             'type' => 'document',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📄 {$resource->title}",
+                            'title' => "📄 ".($file->original_filename ?: $resource->title),
                             'document_file_id' => $file->telegram_file_id,
                             'mime_type' => $file->mime_type ?: 'application/pdf',
                             'caption' => $caption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$descSnippet}{$courseName} • {$typeName} (1 file)",
+                            'description' => "{$courseName} (1 file)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     }
@@ -201,7 +196,7 @@ class InlineQueryHandler
                             'photo_file_id' => $primaryFile->telegram_file_id,
                             'caption' => $partCaption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$descSnippet}{$courseName} • {$typeName} ({$fileCount} files)",
+                            'description' => "{$courseName} ({$fileCount} files)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     } else {
@@ -213,7 +208,7 @@ class InlineQueryHandler
                             'mime_type' => $primaryFile->mime_type ?: 'application/pdf',
                             'caption' => $partCaption,
                             'parse_mode' => 'HTML',
-                            'description' => "{$descSnippet}{$courseName} • {$typeName} ({$fileCount} files)",
+                            'description' => "{$courseName} ({$fileCount} files)",
                             'reply_markup' => ['inline_keyboard' => $keyboard],
                         ];
                     }
@@ -264,7 +259,7 @@ class InlineQueryHandler
                         'type' => 'article',
                         'id' => 'res_' . $resource->id,
                         'title' => "📁 {$resource->title}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
-                        'description' => "{$descSnippet}{$courseName} • {$typeName}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
+                        'description' => "{$courseName} ({$fileCount} ".($fileCount === 1 ? 'file' : 'files').')',
                         'input_message_content' => [
                             'message_text' => $messageText,
                             'parse_mode' => 'HTML',
