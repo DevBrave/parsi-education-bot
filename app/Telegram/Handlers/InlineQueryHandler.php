@@ -192,7 +192,7 @@ class InlineQueryHandler
                         $items[] = [
                             'type' => 'photo',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📁 {$resource->title} ({$fileCount} files)",
+                            'title' => "📁 {$resource->title} ",
                             'photo_file_id' => $primaryFile->telegram_file_id,
                             'caption' => $partCaption,
                             'parse_mode' => 'HTML',
@@ -203,7 +203,7 @@ class InlineQueryHandler
                         $items[] = [
                             'type' => 'document',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📁 {$resource->title} ({$fileCount} files)",
+                            'title' => "📁 {$resource->title} ",
                             'document_file_id' => $primaryFile->telegram_file_id,
                             'mime_type' => $primaryFile->mime_type ?: 'application/pdf',
                             'caption' => $partCaption,
@@ -258,7 +258,7 @@ class InlineQueryHandler
                     $items[] = [
                         'type' => 'article',
                         'id' => 'res_' . $resource->id,
-                        'title' => "📁 {$resource->title}" . ($fileCount > 1 ? " ({$fileCount} files)" : ''),
+                        'title' => "📁 {$resource->title}" ,
                         'description' => "{$courseName} ({$fileCount} ".($fileCount === 1 ? 'file' : 'files').')',
                         'input_message_content' => [
                             'message_text' => $messageText,
