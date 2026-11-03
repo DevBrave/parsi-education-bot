@@ -16,6 +16,30 @@ use Tests\TestCase;
 
 class ResourceUploadStatusTest extends TestCase
 {
+    public function test_folder_failure_retains_source_and_does_not_reject_resource(): void
+    {
+        config(['telegram.max_upload_size_mb' => 0]);
+        Storage::fake('local');
+        Storage::disk('local')->put('resources/test.pdf', '%PDF-test');
+        $resource = new Resource(['status' => 'approved', 'title' => 'Test']);
+        $resource->setRelations(['course' => null, 'resourceType' => null, 'submitter' => null]);
+        $file = Mockery::mock(ResourceFile::class)->makePartial();
+        $file->forceFill(['id' => 1, 'resource_id' => 1, 'original_filename' => 'test.pdf', 'mime_type' => 'application/pdf']);
+        $file->setRelation('resource', $resource);
+        $file->shouldReceive('fresh')->andReturn($file);
+        $file->shouldNotReceive('update');
+        $telegram = Mockery::mock(TelegramService::class);
+        $telegram->shouldNotReceive('uploadDocument');
+        $drive = Mockery::mock(GoogleDriveService::class);
+        $drive->shouldReceive('isConfigured')->once()->andReturn(true);
+        $drive->shouldReceive('getOrCreateFolder')->once()->andReturnNull();
+        $drive->shouldNotReceive('uploadFile');
+
+        $this->assertFalse((new ResourceUploadService($telegram, $drive))->sync($file, 'resources/test.pdf'));
+        $this->assertSame('approved', $resource->status);
+        Storage::disk('local')->assertExists('resources/test.pdf');
+    }
+
     public static function languages(): array
     {
         return [['en'], ['fa'], ['it']];

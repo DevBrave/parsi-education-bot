@@ -57,7 +57,6 @@ class ResourceUploadService
             $driveStarted = microtime(true);
             bot_log('drive')->info('Resource Drive stage started', ['resource_file_id' => $resourceFile->id]);
 
-
             try {
                 if (! $driveFileId && $isApproved && $this->googleDriveService->isConfigured()) {
                     try {
@@ -74,10 +73,9 @@ class ResourceUploadService
                 ]);
             }
 
-            // If neither Telegram nor Google Drive received the file, mark rejected and abort
+            // Transfer failures must not change the content's moderation status.
             if (! $hasTgFile && ! $driveFileId) {
                 bot_log('telegram')->error("Failed to sync ResourceFile #{$resourceFile->id}: both Telegram and Google Drive were unavailable.");
-                $resourceFile->resource?->update(['status' => 'rejected']);
 
                 return false;
             }
@@ -92,7 +90,7 @@ class ResourceUploadService
 
                     $linkResponse = $this->telegramService->sendMessage(
                         $this->storageChannelId,
-                        $formattedCaption . "\n\n<a href=\"{$driveUrl}\">" . e($downloadLabel) . '</a>',
+                        $formattedCaption."\n\n<a href=\"{$driveUrl}\">".e($downloadLabel).'</a>',
                         ['inline_keyboard' => [[['text' => $downloadLabel, 'url' => $driveUrl]]]],
                     );
                     if ($linkResponse->json('ok')) {
@@ -117,12 +115,11 @@ class ResourceUploadService
                 Storage::disk('local')->delete($storedPath);
             }
 
-            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: " . ($hasTgFile ? 'yes' : 'no') . ', Drive: ' . ($driveFileId ? 'yes' : 'no') . ').');
+            bot_log('telegram')->info("Resource #{$resourceFile->resource_id} successfully synced (Telegram: ".($hasTgFile ? 'yes' : 'no').', Drive: '.($driveFileId ? 'yes' : 'no').').');
 
             return true;
         } catch (\Throwable $e) {
             bot_log('telegram')->error("Error syncing ResourceFile #{$resourceFile->id}: {$e->getMessage()}");
-            $resourceFile->resource?->update(['status' => 'rejected']);
             // Retain the source so a failed external upload can be recovered.
 
             return false;
@@ -184,7 +181,6 @@ class ResourceUploadService
     protected function uploadToTelegram(ResourceFile $resourceFile, string $fullPath, string $formattedCaption): ?array
     {
 
-
         $fileSizeBytes = file_exists($fullPath) ? filesize($fullPath) : 0;
         $tgResult = null;
 
@@ -234,10 +230,17 @@ class ResourceUploadService
         $courseType = $resourceFile->resource?->resourceType?->display_name ?? 'Materials';
         // 1. Find or create the Course folder (e.g., "Algorithms")
         $courseFolderId = $this->googleDriveService->getOrCreateFolder($courseName);
+        if (! $courseFolderId) {
+            return null;
+        }
         // 2. Find or create the ResourceType subfolder INSIDE the Course folder (e.g., "Past Exams")
         $targetFolderId = $courseFolderId
             ? $this->googleDriveService->getOrCreateFolder($courseType, $courseFolderId)
             : null;
+        if (! $targetFolderId) {
+            return null;
+        }
+
         return $this->googleDriveService->uploadFile(
             filePath: $fullPath,
             filename: $resourceFile->original_filename,

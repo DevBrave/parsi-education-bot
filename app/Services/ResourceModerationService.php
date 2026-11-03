@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Resource;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ResourceModerationService
@@ -110,7 +109,13 @@ class ResourceModerationService
 
             // Find or create Course folder, and Category subfolder in Drive
             $courseFolderId = $this->driveService->getOrCreateFolder($courseName);
+            if (! $courseFolderId) {
+                return;
+            }
             $targetFolderId = $this->driveService->getOrCreateFolder($typeName, $courseFolderId);
+            if (! $targetFolderId) {
+                return;
+            }
 
             foreach ($resource->files as $file) {
                 if ($file->drive_file_id || in_array($file->id, $excludeFileIds, true)) {
@@ -193,16 +198,16 @@ class ResourceModerationService
             if (! $file->telegram_file_id) {
                 continue;
             }
-            
+
             $cleanTitle = trim(preg_replace('/^📚\s*/u', '', $resource->title ?? ''));
-            $caption = "📚 <b>" . e($courseName) . "</b>";
+            $caption = '📚 <b>'.e($courseName).'</b>';
             if (! empty($cleanTitle)) {
-                $caption .= "\n📌 <b>" . e($cleanTitle) . "</b>";
+                $caption .= "\n📌 <b>".e($cleanTitle).'</b>';
             }
-            $caption .= "\n📄 " . e($file->original_filename);
-            $caption .= "\n🏷️ <b>Category:</b> " . e($categoryName);
+            $caption .= "\n📄 ".e($file->original_filename);
+            $caption .= "\n🏷️ <b>Category:</b> ".e($categoryName);
             if (! empty($submitterName)) {
-                $caption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
+                $caption .= "\n👤 <b>Sent by:</b> ".e($submitterName);
             }
 
             try {
@@ -219,7 +224,7 @@ class ResourceModerationService
 
                 bot_log('telegram')->info("ResourceFile #{$file->id} dispatched to Telegram storage channel {$storageChannelId} (message #{$msgId})");
             } catch (\Throwable $e) {
-                bot_log('telegram')->warning("Failed to send ResourceFile #{$file->id} to storage channel: " . $e->getMessage());
+                bot_log('telegram')->warning("Failed to send ResourceFile #{$file->id} to storage channel: ".$e->getMessage());
             }
         }
     }

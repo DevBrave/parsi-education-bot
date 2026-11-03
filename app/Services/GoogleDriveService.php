@@ -7,8 +7,10 @@ use Google\Http\MediaFileUpload;
 use Google\Service\Drive as GoogleDrive;
 use Google\Service\Drive\DriveFile;
 use Google\Service\Drive\Permission;
+use Google\Service\Exception;
 use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class GoogleDriveService
 {
@@ -19,6 +21,8 @@ class GoogleDriveService
     protected ?string $folderId = null;
 
     protected bool $initialized = false;
+
+    protected ?int $retryInitializationAt = null;
 
     public function __construct()
     {
@@ -31,6 +35,7 @@ class GoogleDriveService
             return;
         }
         $this->initialized = true;
+        $this->retryInitializationAt = null;
 
         $clientId = config('google.client_id');
         $clientSecret = config('google.client_secret');
@@ -50,6 +55,9 @@ class GoogleDriveService
                 $token = $client->fetchAccessTokenWithRefreshToken($refreshToken);
 
                 if (! empty($token['error'])) {
+                    if (in_array($token['error'], ['temporarily_unavailable', 'server_error'], true)) {
+                        $this->retryInitializationAt = now()->getTimestamp() + 30;
+                    }
                     bot_log('drive')->warning('Google Drive refresh token invalid or expired: '.($token['error_description'] ?? $token['error']));
                 } else {
                     $this->client = $client;
@@ -58,6 +66,7 @@ class GoogleDriveService
                     return;
                 }
             } catch (\Throwable $e) {
+                $this->retryInitializationAt = now()->getTimestamp() + 30;
                 bot_log('drive')->error('Failed to initialize Google Drive OAuth client: '.$e->getMessage());
             }
 
@@ -83,7 +92,7 @@ class GoogleDriveService
 
     protected function createClient(): GoogleClient
     {
-        $client = new GoogleClient;
+        $client = new GoogleClient(['retry' => ['retries' => 3]]);
         $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
 
         return $client;
@@ -94,6 +103,9 @@ class GoogleDriveService
      */
     public function isConfigured(): bool
     {
+        if ($this->retryInitializationAt !== null && now()->getTimestamp() >= $this->retryInitializationAt) {
+            $this->initialized = false;
+        }
         $started = microtime(true);
         if (! $this->initialized) {
             try {
@@ -119,62 +131,62 @@ class GoogleDriveService
             return null;
         }
 
-        $parent = $parentFolderId ?? $this->folderId;
+        $parent = $parentFolderId ?? $this->folderId ?? 'root';
 
         try {
-            $cleanName = str_replace("'", "\\'", $folderName);
-            $query = "mimeType = 'application/vnd.google-apps.folder' and name = '{$cleanName}' and trashed = false";
-            if ($parent) {
-                $query .= " and '{$parent}' in parents";
-            }
+            $lockKey = 'drive:folder:'.hash('sha256', $this->accountKey().$parent.'\0'.$folderName);
 
-            $results = $this->driveService->files->listFiles([
-                'q' => $query,
-                'spaces' => 'drive',
-                'fields' => 'files(id, name)',
-                'supportsAllDrives' => true,
-                'includeItemsFromAllDrives' => true,
-                'pageSize' => 1,
-            ]);
+            return Cache::lock($lockKey, 600)->block(5, function () use ($folderName, $parent) {
+                $cleanName = str_replace(['\\', "'"], ['\\\\', "\\'"], $folderName);
+                $query = "mimeType = 'application/vnd.google-apps.folder' and name = '{$cleanName}' and trashed = false";
+                if ($parent) {
+                    $query .= " and '{$parent}' in parents";
+                }
 
-            $files = $results->getFiles();
-            if (! empty($files)) {
-                return $files[0]->getId();
-            }
+                $results = $this->driveService->files->listFiles([
+                    'q' => $query,
+                    'spaces' => 'drive',
+                    'fields' => 'files(id, name)',
+                    'supportsAllDrives' => true,
+                    'includeItemsFromAllDrives' => true,
+                    'pageSize' => 1,
+                ]);
 
-            $folderMetadata = new DriveFile([
-                'name' => $folderName,
-                'mimeType' => 'application/vnd.google-apps.folder',
-            ]);
+                $files = $results->getFiles();
+                if (! empty($files)) {
+                    return $files[0]->getId();
+                }
 
-            if ($parent) {
-                $folderMetadata->setParents([$parent]);
-            }
+                $folderMetadata = new DriveFile([
+                    'name' => $folderName,
+                    'mimeType' => 'application/vnd.google-apps.folder',
+                ]);
 
-            $createdFolder = $this->driveService->files->create($folderMetadata, [
-                'fields' => 'id',
-                'supportsAllDrives' => true,
-            ]);
+                if ($parent) {
+                    $folderMetadata->setParents([$parent]);
+                }
 
-            return $createdFolder->id;
+                $createdFolder = $this->driveService->files->create($folderMetadata, [
+                    'fields' => 'id',
+                    'supportsAllDrives' => true,
+                ]);
+
+                return $createdFolder->id;
+            });
         } catch (\Throwable $e) {
             bot_log('drive')->warning("Failed to get or create Google Drive folder '{$folderName}': ".$e->getMessage());
 
-            return $parent;
+            return null;
         }
     }
 
     /**
      * Upload a file to Google Drive.
-     * Returns the Google Drive file ID on success, or null on failure.
+     * Returns the file ID only after public sharing succeeds.
+     * Reserved IDs survive retries on the local disk; all workers must share that disk.
      */
     public function uploadFile(string $filePath, string $filename, string $mimeType, ?string $folderId = null): ?string
     {
-        // Prevent script timeout and memory exhaustion during large file uploads to Google Drive
-        @set_time_limit(0);
-        @ini_set('max_execution_time', '1800');
-        @ini_set('memory_limit', '1024M');
-
         if (! $this->isConfigured()) {
             bot_log('drive')->warning('Google Drive is not configured. Skipping Drive upload for: '.$filename);
 
@@ -195,7 +207,57 @@ class GoogleDriveService
         }
 
         try {
+            $hash = hash_file('sha256', $filePath);
+            if ($hash === false) {
+                throw new \RuntimeException('Unable to hash upload source.');
+            }
+            $key = hash('sha256', json_encode([$this->accountKey(), $folderId ?? $this->folderId ?? 'root', $filename, $mimeType, $hash], JSON_THROW_ON_ERROR));
+
+            return Cache::lock('drive:upload:'.$key, 3600)->block(5, function () use ($key, $filePath, $filename, $mimeType, $folderId, $fileSize) {
+                $journal = 'drive/uploads/'.$key.'.json';
+                $disk = Storage::disk('local');
+                $state = $disk->exists($journal) ? json_decode($disk->get($journal), true, 512, JSON_THROW_ON_ERROR) : null;
+                $fileId = $state['id'] ?? null;
+                if ($fileId) {
+                    try {
+                        $existing = $this->driveService->files->get($fileId, ['fields' => 'id,trashed', 'supportsAllDrives' => true]);
+                        if ($existing->getTrashed()) {
+                            throw new \RuntimeException('Previously uploaded file is in the trash; restore it before retrying.');
+                        }
+
+                        return $this->makePublic($fileId) ? $fileId : null;
+                    } catch (Exception $exception) {
+                        if ($exception->getCode() !== 404) {
+                            throw $exception;
+                        }
+                        // A reserved ID may not have been uploaded yet. Reuse it after ambiguous failures.
+                    }
+                } else {
+                    $fileId = $this->driveService->files->generateIds(['count' => 1, 'space' => 'drive'])->getIds()[0] ?? null;
+                    if (! $fileId || ! $disk->put($journal, json_encode(['id' => $fileId], JSON_THROW_ON_ERROR))) {
+                        throw new \RuntimeException('Unable to persist reserved Drive upload ID.');
+                    }
+                }
+
+                return $this->uploadContents($filePath, $filename, $mimeType, $folderId, $fileSize, $fileId);
+            });
+        } catch (\Throwable $e) {
+            bot_log('drive')->error('Google Drive upload failed: '.$e->getMessage(), ['filename' => $filename]);
+
+            return null;
+        }
+    }
+
+    protected function accountKey(): string
+    {
+        return hash('sha256', json_encode([config('google.client_id'), config('google.refresh_token'), config('google.service_account_json')], JSON_THROW_ON_ERROR));
+    }
+
+    protected function uploadContents(string $filePath, string $filename, string $mimeType, ?string $folderId, int $fileSize, string $fileId): ?string
+    {
+        try {
             $fileMetadata = new DriveFile([
+                'id' => $fileId,
                 'name' => $filename,
             ]);
 
@@ -224,7 +286,7 @@ class GoogleDriveService
                         $this->client,
                         $request,
                         $mimeType,
-                        null,
+                        '',
                         true,
                         $chunkSizeBytes
                     );
@@ -232,8 +294,17 @@ class GoogleDriveService
 
                     $status = false;
                     $handle = fopen($filePath, 'rb');
+                    if ($handle === false) {
+                        throw new \RuntimeException('Unable to open upload source.');
+                    }
                     while (! $status && ! feof($handle)) {
                         $chunk = fread($handle, $chunkSizeBytes);
+                        if ($chunk === false || ($chunk === '' && ! feof($handle))) {
+                            throw new \RuntimeException('Unable to read upload source.');
+                        }
+                        if ($chunk === '') {
+                            break;
+                        }
                         $status = $media->nextChunk($chunk);
                     }
 
@@ -253,6 +324,9 @@ class GoogleDriveService
             } else {
                 // For files < 5MB, standard multipart upload is faster
                 $content = file_get_contents($filePath);
+                if ($content === false) {
+                    throw new \RuntimeException('Unable to read upload source.');
+                }
 
                 $uploadedFile = $this->driveService->files->create(
                     $fileMetadata,
@@ -274,20 +348,7 @@ class GoogleDriveService
                 return null;
             }
 
-            // Grant direct read permission to anyone with the link so students can view/download
-            try {
-                $permission = new Permission([
-                    'type' => 'anyone',
-                    'role' => 'reader',
-                ]);
-                $this->driveService->permissions->create($uploadedFileId, $permission, [
-                    'supportsAllDrives' => true,
-                ]);
-            } catch (\Throwable $permError) {
-                bot_log('drive')->warning('Could not set public view permission on Google Drive file: '.$permError->getMessage());
-            }
-
-            return $uploadedFileId;
+            return $this->makePublic($uploadedFileId) ? $uploadedFileId : null;
         } catch (\Throwable $e) {
             bot_log('drive')->error('Google Drive file upload failed: '.$e->getMessage(), [
                 'filename' => $filename,
@@ -295,6 +356,25 @@ class GoogleDriveService
             ]);
 
             return null;
+        }
+    }
+
+    protected function makePublic(string $fileId): bool
+    {
+        try {
+            $permission = new Permission([
+                'type' => 'anyone',
+                'role' => 'reader',
+            ]);
+            $this->driveService->permissions->create($fileId, $permission, [
+                'supportsAllDrives' => true,
+            ]);
+
+            return true;
+        } catch (\Throwable $permError) {
+            bot_log('drive')->warning('Could not set public view permission on Google Drive file: '.$permError->getMessage());
+
+            return false;
         }
     }
 
@@ -310,6 +390,7 @@ class GoogleDriveService
         // 1. Attempt permanent deletion first
         try {
             $this->driveService->files->delete($fileId, ['supportsAllDrives' => true]);
+            $this->forgetUploadReservation($fileId);
 
             return true;
         } catch (\Throwable $e) {
@@ -322,6 +403,7 @@ class GoogleDriveService
             $this->driveService->files->update($fileId, $trashUpdate, [
                 'supportsAllDrives' => true,
             ]);
+            $this->forgetUploadReservation($fileId);
 
             $this->log('info', 'Google Drive file moved to trash', ['fileId' => $fileId]);
 
@@ -333,8 +415,25 @@ class GoogleDriveService
         }
     }
 
+    protected function forgetUploadReservation(string $fileId): void
+    {
+        try {
+            $disk = Storage::disk('local');
+            foreach ($disk->files('drive/uploads') as $path) {
+                $state = json_decode($disk->get($path), true, 512, JSON_THROW_ON_ERROR);
+                if (($state['id'] ?? null) === $fileId) {
+                    $disk->delete($path);
+                }
+            }
+        } catch (\Throwable $exception) {
+            bot_log('drive')->warning('Could not remove Drive upload reservation', ['file_id' => $fileId]);
+        }
+    }
+
     /**
      * Log to the dedicated drive channel.
+     *
+     * @param  array<string, mixed>  $context
      */
     protected function log(string $level, string $message, array $context = []): void
     {

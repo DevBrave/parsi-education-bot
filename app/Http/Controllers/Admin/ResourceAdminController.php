@@ -601,7 +601,13 @@ class ResourceAdminController extends Controller
             $typeName = $resource->resourceType?->display_name ?? 'Notes';
 
             $courseFolderId = $driveService->getOrCreateFolder($courseName);
+            if (! $courseFolderId) {
+                return back()->with('error', 'Could not prepare the Google Drive course folder. Please retry.');
+            }
             $targetFolderId = $driveService->getOrCreateFolder($typeName, $courseFolderId);
+            if (! $targetFolderId) {
+                return back()->with('error', 'Could not prepare the Google Drive category folder. Please retry.');
+            }
 
             $syncedCount = 0;
             $failedCount = 0;
