@@ -93,7 +93,13 @@ class GoogleDriveService
     protected function createClient(): GoogleClient
     {
         $client = new GoogleClient(['retry' => ['retries' => 3]]);
-        $client->setHttpClient(new Client(['connect_timeout' => 10, 'timeout' => 120]));
+        $client->setHttpClient(new Client([
+            'connect_timeout' => 10,
+            'timeout' => 120,
+            // This server's upload endpoint checks succeed with IPv4 and HTTP/1.1.
+            'version' => '1.1',
+            'force_ip_resolve' => 'v4',
+        ]));
 
         return $client;
     }
