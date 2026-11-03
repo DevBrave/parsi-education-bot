@@ -144,7 +144,7 @@ class InlineQueryHandler
                         $items[] = [
                             'type' => 'photo',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📄 ".($file->original_filename ?: $resource->title),
+                            'title' => "📄 ".($resource->title ?: $file->original_filename),
                             'photo_file_id' => $file->telegram_file_id,
                             'caption' => $caption,
                             'parse_mode' => 'HTML',
@@ -155,7 +155,7 @@ class InlineQueryHandler
                         $items[] = [
                             'type' => 'document',
                             'id' => 'res_' . $resource->id,
-                            'title' => "📄 ".($file->original_filename ?: $resource->title),
+                            'title' => "📄 ".($resource->title ?: $file->original_filename),
                             'document_file_id' => $file->telegram_file_id,
                             'mime_type' => $file->mime_type ?: 'application/pdf',
                             'caption' => $caption,

@@ -43,6 +43,7 @@ class UploadResourceFileJob implements ShouldBeUnique, ShouldQueue
         public string $storedPath,
         public string $caption = ''
     ) {
+        $this->onQueue('uploads');
         $this->queuedAt = microtime(true);
     }
 
