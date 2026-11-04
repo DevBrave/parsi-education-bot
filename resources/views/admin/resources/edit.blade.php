@@ -188,9 +188,13 @@
             <div class="form-group">
                 <label for="course_id">Course *</label>
                 <select name="course_id" id="course_id" required>
-                    @foreach($courses as $course)
-                        <option value="{{ $course->id }}" {{ old('course_id', $resource->course_id) == $course->id ? 'selected' : '' }}>
-                            {{ $course->name }} ({{ $course->course_code }})
+                   @foreach ($courses as $course)
+                        <option value="{{ $course->id }}" {{ old('course_id') == $course->id ? 'selected' : '' }}>
+                            {{ $course->name }}
+                            @if(auth()->user()->isAdmin() && count($course->programs) < 2)
+                                ({{ $course->programs->first()?->name }})
+                            @endif
+                            
                         </option>
                     @endforeach
                 </select>

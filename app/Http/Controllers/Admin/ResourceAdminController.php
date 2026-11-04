@@ -146,7 +146,9 @@ class ResourceAdminController extends Controller
             $programId = $user->program_id;
             $courseQuery->whereHas('programs', fn ($q) => $q->where('programs.id', $programId));
         }
-
+        if($user && $user->isAdmin() && $user->program_id){
+            $courseQuery->with('programs'); 
+        }
         $courses = $courseQuery->get();
         $resourcesTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
         $academicYears = AcademicYear::all();
@@ -155,6 +157,7 @@ class ResourceAdminController extends Controller
             'courses' => $courses,
             'resourceTypes' => $resourcesTypes,
             'academicYears' => $academicYears,
+            'user' => $user
         ]);
     }
 
