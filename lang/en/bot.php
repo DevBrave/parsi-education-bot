@@ -218,6 +218,7 @@ return [
         'too_short' => '⚠️ Please type at least 3 characters.',
         'send_message_btn' => '💬 Send Message to Admins',
         'channel_btn' => '📢 PARSI Telegram Channel',
+        'email_btn' => '📧 PARSI Email Address',
         'write_prompt' => "✍️ <b>Contact PARSI Team</b>\n\nPlease type your message, feedback, or inquiry below.\nOur administrators will review it and reply as soon as possible:",
         'sent_success' => "✅ <b>Message Sent!</b>\n\nThank you for reaching out. The PARSI team has received your message and will review it.",
         'cancel' => '❌ Cancel',

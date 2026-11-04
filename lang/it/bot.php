@@ -212,6 +212,7 @@ return [
         'report_material_btn' => '🔍 Cerca Materiale da Segnalare',
         'send_message_btn' => '💬 Invia Messaggio ai Moderatori',
         'channel_btn' => '📢 Canale Telegram PARSI',
+        'email_btn' => '📧 PARSI indirizzo Email',
         'write_prompt' => "✍️ <b>Contatta il Team PARSI</b>\n\nScrivi qui sotto il tuo messaggio o richiesta.\nI nostri moderatori lo riceveranno e ti risponderanno al più presto:",
         'sent_success' => "✅ <b>Messaggio Inviato!</b>\n\nGrazie per averci contattato. Il team PARSI ha ricevuto il tuo messaggio.",
         'cancel' => '❌ Annulla',

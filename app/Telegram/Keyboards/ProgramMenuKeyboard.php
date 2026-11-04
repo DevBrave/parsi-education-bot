@@ -896,6 +896,9 @@ class ProgramMenuKeyboard
                 [
                     ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
                 ],
+                [
+                    ['text' => __('bot.contact.email_btn', [], $lang), 'url' => 'mailto:parsi.polito@gmail.com'],
+                ],
             ],
         ];
     }
