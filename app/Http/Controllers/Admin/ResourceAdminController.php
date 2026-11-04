@@ -208,9 +208,9 @@ class ResourceAdminController extends Controller
             // Check for duplicate file
             $existingFile = ResourceFile::where('sha256', $fileHash)->first();
             if ($existingFile) {
-                throw ValidationException::withMessages([
-                    'files' => "The file '{$file->getClientOriginalName()}' has already been uploaded. Please choose a different file.",
-                ]);
+               return back()
+                        ->withInput()
+                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
             }
 
             $filesToUpload[] = [
