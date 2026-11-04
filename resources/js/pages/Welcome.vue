@@ -45,14 +45,14 @@ const features = [
 </script>
 
 <template>
-    <Head title="ParsiPolito | Student Hub" />
+    <Head title="PARSI | Student Hub" />
     <div class="home-page">
         <header class="site-header">
             <div class="header-inner">
                 <a href="/" class="brand" aria-label="ParsiPolito home">
                     <img src="/ParsiLogo.jpg" alt="ParsiPolito logo" />
                     <span
-                        >Parsi<span class="brand-accent">Polito</span
+                        >PARSI<span class="brand-accent"></span
                         ><small>THE STUDENT HUB</small></span
                     >
                 </a>
