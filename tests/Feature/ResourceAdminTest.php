@@ -46,6 +46,45 @@ class ResourceAdminTest extends TestCase
         $response->assertRedirect(route('admin.login'));
     }
 
+    public function test_duplicate_upload_returns_a_visible_validation_error_for_ajax_requests(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->mock(\App\Services\FileSecurityService::class, function ($mock) {
+            $mock->shouldReceive('validateUpload')->once()->andReturn(['valid' => true]);
+        });
+
+        $contents = "%PDF-1.4\nDuplicate test document";
+        $resource = Resource::create([
+            'course_id' => $this->course->id,
+            'resource_type_id' => $this->resourceType->id,
+            'title' => 'Existing material',
+            'status' => 'approved',
+            'submitted_by' => $this->admin->id,
+        ]);
+        $resource->files()->create([
+            'original_filename' => 'original.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+        ]);
+        $resourceCount = Resource::count();
+        $fileCount = \App\Models\ResourceFile::count();
+
+        $response = $this->actingAs($this->admin)->post(route('admin.resources.store'), [
+            'course_id' => $this->course->id,
+            'resource_type_id' => $this->resourceType->id,
+            'title' => 'Duplicate material',
+            'status' => 'approved',
+            'files' => [\Illuminate\Http\UploadedFile::fake()->createWithContent('duplicate.pdf', $contents)],
+        ], ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest']);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('files');
+        $response->assertJsonPath('errors.files.0', "The file 'duplicate.pdf' has already been uploaded. Please choose a different file.");
+        $this->assertSame($resourceCount, Resource::count());
+        $this->assertSame($fileCount, \App\Models\ResourceFile::count());
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+    }
+
     public function test_student_cannot_access_resources_admin(): void
     {
         $student = User::firstOrNew(['telegram_user_id' => 777777]);

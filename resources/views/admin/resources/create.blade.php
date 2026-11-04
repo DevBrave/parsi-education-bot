@@ -239,6 +239,7 @@
             const xhr = new XMLHttpRequest();
             xhr.open('POST', form.action, true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.setRequestHeader('Accept', 'application/json');
 
             xhr.upload.onprogress = function (event) {
                 if (event.lengthComputable) {

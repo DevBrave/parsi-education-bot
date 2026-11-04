@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ResourceAdminController extends Controller
 {
@@ -197,9 +198,9 @@ class ResourceAdminController extends Controller
             );
 
             if (! $security['valid']) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
+                throw ValidationException::withMessages([
+                    'files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']}).",
+                ]);
             }
 
             $fileHash = hash_file('sha256', $file->getRealPath());
@@ -207,9 +208,9 @@ class ResourceAdminController extends Controller
             // Check for duplicate file
             $existingFile = ResourceFile::where('sha256', $fileHash)->first();
             if ($existingFile) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was already uploaded."]);
+                throw ValidationException::withMessages([
+                    'files' => "The file '{$file->getClientOriginalName()}' has already been uploaded. Please choose a different file.",
+                ]);
             }
 
             $filesToUpload[] = [
