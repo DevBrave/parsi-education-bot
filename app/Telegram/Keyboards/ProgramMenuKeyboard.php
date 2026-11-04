@@ -691,9 +691,6 @@ class ProgramMenuKeyboard
             $name = is_array($type) ? ($type['display_name'] ?? '') : ($type->display_name ?? '');
 
             $count = $counts[$id] ?? 0;
-            if ($count === 0) {
-                continue;
-            }
 
             $buttons[] = [
                 ['text' => "📖 {$name} ({$count})", 'callback_data' => "resource_type_{$id}_{$courseId}_{$programId}_{$year}_1"],
