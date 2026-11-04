@@ -898,7 +898,7 @@ class ProgramMenuKeyboard
                 ],
                 [
                     ['text' => __('bot.contact.email_btn', [], $lang),  'url' => 'https://mail.google.com/mail/?view=cm&' . http_build_query([
-                        'to' => 'parsi.polito@gmail.com',
+                        'to' => config('telegram.email_address'),
                     ]),],
                 ],
             ],
