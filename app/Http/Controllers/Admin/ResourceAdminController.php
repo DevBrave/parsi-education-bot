@@ -208,9 +208,9 @@ class ResourceAdminController extends Controller
             // Check for duplicate file
             $existingFile = ResourceFile::where('sha256', $fileHash)->first();
             if ($existingFile) {
-               return back()
-                        ->withInput()
-                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
+                throw ValidationException::withMessages([
+                    'files' => "The file '{$file->getClientOriginalName()}' has already been uploaded. Please choose a different file.",
+                ]);
             }
 
             $filesToUpload[] = [
@@ -358,18 +358,18 @@ class ResourceAdminController extends Controller
                 );
 
                 if (! $security['valid']) {
-                    return back()
-                        ->withInput()
-                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']})."]);
+                    throw ValidationException::withMessages([
+                        'files' => "The file '{$file->getClientOriginalName()}' was rejected by security inspection ({$security['reason']}).",
+                    ]);
                 }
 
                 $fileHash = hash_file('sha256', $file->getRealPath());
 
                 $existingFile = ResourceFile::where('sha256', $fileHash)->first();
                 if ($existingFile) {
-                    return back()
-                        ->withInput()
-                        ->withErrors(['files' => "The file '{$file->getClientOriginalName()}' was already uploaded."]);
+                    throw ValidationException::withMessages([
+                        'files' => "The file '{$file->getClientOriginalName()}' has already been uploaded. Please choose a different file.",
+                    ]);
                 }
 
                 $filesToUpload[] = [
@@ -576,7 +576,9 @@ class ResourceAdminController extends Controller
             return back()->with('info', "This file ('{$file->original_filename}', {$file->formatted_size}) exceeds Telegram's 20MB Bot API download limit. Please check and download it directly in the PARSI BOT ADMINS Telegram group.");
         }
 
-        return back()->with('error', 'Document file is currently not accessible for preview or download.');
+        throw ValidationException::withMessages([
+            'file' => 'Document file is currently not accessible for preview or download.',
+        ]);
     }
 
     /**
@@ -594,7 +596,9 @@ class ResourceAdminController extends Controller
         @ini_set('memory_limit', '1024M');
 
         if (! $driveService->isConfigured()) {
-            return back()->with('error', 'Google Drive service is not configured or token is invalid on this server.');
+            throw ValidationException::withMessages([
+                'drive' => 'Google Drive service is not configured or token is invalid on this server.',
+            ]);
         }
 
         try {
@@ -603,11 +607,15 @@ class ResourceAdminController extends Controller
 
             $courseFolderId = $driveService->getOrCreateFolder($courseName);
             if (! $courseFolderId) {
-                return back()->with('error', 'Could not prepare the Google Drive course folder. Please retry.');
+                throw ValidationException::withMessages([
+                    'drive' => 'Could not prepare the Google Drive course folder. Please retry.',
+                ]);
             }
             $targetFolderId = $driveService->getOrCreateFolder($typeName, $courseFolderId);
             if (! $targetFolderId) {
-                return back()->with('error', 'Could not prepare the Google Drive category folder. Please retry.');
+                throw ValidationException::withMessages([
+                    'drive' => 'Could not prepare the Google Drive category folder. Please retry.',
+                ]);
             }
 
             $syncedCount = 0;
@@ -671,14 +679,20 @@ class ResourceAdminController extends Controller
             if ($syncedCount > 0) {
                 return redirect()->route('admin.resources.edit', $resource)->with('success', "{$syncedCount} file(s) successfully synced to Google Drive!");
             } elseif ($failedCount > 0) {
-                return redirect()->route('admin.resources.edit', $resource)->with('error', "Could not sync {$failedCount} file(s) to Google Drive. Check drive logs for details.");
+                throw ValidationException::withMessages([
+                    'drive' => "Could not sync {$failedCount} file(s) to Google Drive. Check drive logs for details.",
+                ]);
             }
 
             return redirect()->route('admin.resources.edit', $resource)->with('info', 'All files for this resource are already synced to Google Drive.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             bot_log('drive')->error("Manual Drive sync error on Resource #{$resource->id}: ".$e->getMessage());
 
-            return redirect()->route('admin.resources.edit', $resource)->with('error', 'Google Drive sync failed: '.$e->getMessage());
+            throw ValidationException::withMessages([
+                'drive' => 'Google Drive sync failed: '.$e->getMessage(),
+            ]);
         }
     }
 }
