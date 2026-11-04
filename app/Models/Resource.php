@@ -40,7 +40,20 @@ class Resource extends Model
         };
 
 
-        static::deleted($flushSearchCaches);
+        static::saved(function (Resource $resource) {
+            if ($resource->wasRecentlyCreated || $resource->wasChanged(['course_id', 'resource_type_id', 'status'])) {
+                Cache::forget("catalog:resource_type_counts:course_{$resource->course_id}");
+                $previousCourseId = $resource->getOriginal('course_id');
+                if ($previousCourseId && $previousCourseId != $resource->course_id) {
+                    Cache::forget("catalog:resource_type_counts:course_{$previousCourseId}");
+                }
+            }
+        });
+
+        static::deleted(function (Resource $resource) use ($flushSearchCaches) {
+            $flushSearchCaches();
+            Cache::forget("catalog:resource_type_counts:course_{$resource->course_id}");
+        });
     }
 
     public function course(): BelongsTo

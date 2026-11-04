@@ -4,6 +4,7 @@ namespace App\Telegram\Keyboards;
 
 use App\Models\Course;
 use App\Models\Program;
+use App\Models\Resource;
 use App\Models\ResourceType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -675,13 +676,27 @@ class ProgramMenuKeyboard
     public static function resourceTypes(iterable $resourceTypes, int $courseId, int $programId, ?string $lang = 'en', $year = 'all'): array
     {
         $lang = $lang ?: 'en';
+        $counts = Cache::remember("catalog:resource_type_counts:course_{$courseId}", now()->addMinutes(10), function () use ($courseId) {
+            return Resource::where('course_id', $courseId)
+                ->where('status', 'approved')
+                ->selectRaw('resource_type_id, COUNT(*) AS resource_count')
+                ->groupBy('resource_type_id')
+                ->pluck('resource_count', 'resource_type_id')
+                ->map(fn ($count) => (int) $count)
+                ->all();
+        });
         $buttons = [];
         foreach ($resourceTypes as $type) {
             $id = is_array($type) ? ($type['id'] ?? 0) : ($type->id ?? 0);
             $name = is_array($type) ? ($type['display_name'] ?? '') : ($type->display_name ?? '');
 
+            $count = $counts[$id] ?? 0;
+            if ($count === 0) {
+                continue;
+            }
+
             $buttons[] = [
-                ['text' => "📖 {$name}", 'callback_data' => "resource_type_{$id}_{$courseId}_{$programId}_{$year}_1"],
+                ['text' => "📖 {$name} ({$count})", 'callback_data' => "resource_type_{$id}_{$courseId}_{$programId}_{$year}_1"],
             ];
         }
 
