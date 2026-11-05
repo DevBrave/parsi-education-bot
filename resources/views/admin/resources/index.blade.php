@@ -371,12 +371,6 @@
                                                 title="Open in Google Drive">
                                                 📁 Drive Synced ↗
                                             </a>
-                                        @elseif($primaryFile && $primaryFile->size_bytes > 20 * 1024 * 1024)
-                                            <span
-                                                style="color: #b45309; font-size: 0.685rem; display: inline-flex; align-items: center; gap: 0.25rem;"
-                                                title="File exceeds Telegram's 20MB Bot API limit. Edit resource to upload to Google Drive.">
-                                                ⚠️ >20MB (No Drive)
-                                            </span>
                                         @else
                                             <span
                                                 style="color: #64748b; font-size: 0.685rem; display: inline-flex; align-items: center; gap: 0.25rem;">
