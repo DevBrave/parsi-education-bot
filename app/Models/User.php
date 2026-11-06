@@ -52,6 +52,15 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_MODERATOR = 'moderator';
+    public const ROLE_MAJOR_ADMIN = 'major_admin';
+    public const ROLE_PROFESSOR = 'professor';
+    public const ROLE_EDITOR = 'editor';
+    public const ROLE_VIEWER = 'viewer';
+    public const ROLE_STUDENT = 'student';
+    public const ROLE_VIP = "vip"; // TODO : ADD nishit and ilia as vip
+
     /**
      * @return array<string, string>
      */
@@ -83,14 +92,7 @@ class User extends Authenticatable
         });
     }
 
-    public const ROLE_ADMIN = 'admin';
-    public const ROLE_MODERATOR = 'moderator';
-    public const ROLE_MAJOR_ADMIN = 'major_admin';
-    public const ROLE_PROFESSOR = 'professor';
-    public const ROLE_EDITOR = 'editor';
-    public const ROLE_VIEWER = 'viewer';
-    public const ROLE_STUDENT = 'student';
-    public const ROLE_VIP = "vip"; // TODO : ADD nishit and ilia as vip
+
 
     public function program(): BelongsTo
     {
@@ -175,7 +177,7 @@ class User extends Authenticatable
 
     public function canManageCatalog(): bool
     {
-        return $this->isAdmin() || $this->isEditor() || $this->isModerator(); 
+        return $this->isAdmin() || $this->isEditor() || $this->isModerator();
     }
 
     public function canViewReports(): bool

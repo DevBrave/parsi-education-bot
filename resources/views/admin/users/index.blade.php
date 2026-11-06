@@ -135,7 +135,6 @@
                         <th style="min-width: 120px;">Role</th>
                         <th style="min-width: 180px;">Assigned Major</th>
                         <th style="min-width: 180px;">Web Login / Email</th>
-                        <th style="min-width: 120px;">Telegram ID</th>
                         <th style="text-align: right; min-width: 90px;">Actions</th>
                     </tr>
                 </thead>
@@ -219,22 +218,10 @@
                                     <span style="color: var(--text-muted); font-size: 0.75rem;">(No web login email)</span>
                                 @endif
                             </td>
-
-                            <!-- 5. Telegram ID -->
-                            <td>
-                                @if($user->telegram_user_id)
-                                    <span style="font-family: monospace; font-size: 0.775rem; color: var(--text-muted);">
-                                        #{{ $user->telegram_user_id }}
-                                    </span>
-                                @else
-                                    <span style="color: var(--text-muted); font-size: 0.75rem;">Web only</span>
-                                @endif
-                            </td>
-
                             <!-- 6. Actions -->
                             <td style="text-align: right;">
                                 <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px;">
-                                    Edit Role ⚙️
+                                    Edit ⚙️
                                 </a>
                             </td>
                         </tr>

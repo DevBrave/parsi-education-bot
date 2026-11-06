@@ -93,6 +93,13 @@ class ResourceAdminController extends Controller
             $query->whereHas('files', fn ($q) => $q->whereNotNull('drive_file_id'));
         }
 
+        $user = $request->user();
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $query->whereHas('course.programs', function ($q) use ($user) {
+                $q->where('programs.id', $user->program_id);
+            });
+        }
+
         $resources = $query->paginate(15)->withQueryString();
 
         // Platform Sync & Source Stats
@@ -110,7 +117,7 @@ class ResourceAdminController extends Controller
         ];
 
         $courseQuery = Course::where('is_active', true)->orderBy('name');
-        $user = $request->user();
+        
         if ($user && $user->isProfessor() && $user->program_id) {
             $courseQuery->whereHas('programs', function ($q) use ($user) {
                 $q->where('programs.id', $user->program_id);
@@ -119,7 +126,11 @@ class ResourceAdminController extends Controller
         $courses = $courseQuery->get();
         $resourceTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
         $academicYears = AcademicYear::all();
-        $programs = Program::where('is_active', true)->orderBy('degree_level', 'asc')->orderBy('name', 'asc')->get();
+        $programQuery = Program::where('is_active', true)->orderBy('degree_level', 'asc')->orderBy('name', 'asc');
+        if ($user && $user->isProfessor() && $user->program_id) {
+            $programQuery->where('id', $user->program_id);
+        }
+        $programs = $programQuery->get();
 
         return view('admin.resources.index', [
             'resources' => $resources,

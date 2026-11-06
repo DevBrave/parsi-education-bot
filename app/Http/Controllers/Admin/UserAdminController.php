@@ -13,6 +13,8 @@ use Illuminate\View\View;
 
 class UserAdminController extends Controller
 {
+   
+
     /**
      * Display a paginated listing of users with role filtering.
      */
@@ -137,5 +139,26 @@ class UserAdminController extends Controller
         return redirect()
             ->route('admin.users.index')
             ->with('success', "User '{$user->first_name} {$user->last_name}' updated successfully! Role set to {$user->role_label}.");
+    }
+
+     public function setBlocked(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()?->canManageUsers(), 403);
+
+        $validated = $request->validate([
+            'is_blocked' => ['required', 'boolean'],
+        ]);
+
+        $user->is_blocked = (bool) $validated['is_blocked'];
+        $user->save();
+
+        $action = $user->is_blocked ? 'blocked' : 'unblocked';
+        log_rbac("User #{$user->id} {$action}", $request->user(), [
+            'target_user_id' => $user->id,
+            'is_blocked' => $user->is_blocked,
+        ]);
+
+        return redirect()->route('admin.users.edit', $user)
+            ->with('success', "User {$action} successfully.");
     }
 }

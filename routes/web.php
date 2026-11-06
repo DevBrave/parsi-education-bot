@@ -78,6 +78,7 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::get('/users', [\App\Http\Controllers\Admin\UserAdminController::class, 'index'])->name('admin.users.index');
     Route::get('/users/{user}/edit', [\App\Http\Controllers\Admin\UserAdminController::class, 'edit'])->name('admin.users.edit');
     Route::put('/users/{user}', [\App\Http\Controllers\Admin\UserAdminController::class, 'update'])->name('admin.users.update');
+    Route::patch('/users/{user}/blocked', [\App\Http\Controllers\Admin\UserAdminController::class, 'setBlocked'])->name('admin.users.blocked');
 
     // 7. Resource Reports
     Route::get('/reports', [\App\Http\Controllers\Admin\ReportAdminController::class, 'index'])->name('admin.reports.index');
