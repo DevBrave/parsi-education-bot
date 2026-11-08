@@ -33,6 +33,8 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     // 0. Dashboard
     Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+    Route::get('/bot-access', [\App\Http\Controllers\Admin\BotAccessController::class, 'edit'])->name('admin.bot-access.edit');
+    Route::put('/bot-access', [\App\Http\Controllers\Admin\BotAccessController::class, 'update'])->name('admin.bot-access.update');
 
     // 1. Resources
     Route::get('/resources', [ResourceAdminController::class, 'index'])->name('admin.resources.index');

@@ -76,6 +76,9 @@
             @endif
             @if(Auth::check() && Auth::user()->canManageUsers())
                 <li>
+                    <a href="{{ route('admin.bot-access.edit') }}" class="nav-link {{ request()->routeIs('admin.bot-access.*') ? 'active' : '' }}">Bot Access</a>
+                </li>
+                <li>
                     <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                         👥 Users & Roles
                     </a>

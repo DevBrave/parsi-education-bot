@@ -9,6 +9,7 @@ use App\Telegram\Handlers\FileUploadHandler;
 use App\Telegram\Handlers\InlineQueryHandler;
 use App\Telegram\Handlers\MessageHandler;
 use App\Telegram\Middleware\CheckUserOnboarding;
+use App\Telegram\Middleware\BotAccessMiddleware;
 use App\Telegram\Middleware\TelegramRateLimiter;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -22,7 +23,8 @@ class TelegramUpdateDispatcher
         protected CheckUserOnboarding $onboardingMiddleware,
         protected FileUploadHandler $fileUploadHandler,
         protected InlineQueryHandler $inlineQueryHandler,
-        protected TelegramRateLimiter $rateLimiter
+        protected TelegramRateLimiter $rateLimiter,
+        protected BotAccessMiddleware $botAccessMiddleware,
     ) {}
 
     /**
@@ -41,7 +43,9 @@ class TelegramUpdateDispatcher
             if ($from && isset($from['id'])) {
                 $user = $this->resolveUser($from);
                 if ($user && ! $user->is_blocked) {
-                    $this->inlineQueryHandler->handle($inlineQuery, $user); // Yes, we do not care about blocked user 
+                    if (! $this->botAccessMiddleware->handle($payload, $user)) {
+                        $this->inlineQueryHandler->handle($inlineQuery, $user);
+                    }
                 }
             }
 
@@ -86,6 +90,10 @@ class TelegramUpdateDispatcher
         if ($user->is_blocked) {
             bot_log('rbac')->warning("Blocked user attempted access: {$user->telegram_user_id}");
 
+            return;
+        }
+
+        if ($this->botAccessMiddleware->handle($payload, $user)) {
             return;
         }
 
