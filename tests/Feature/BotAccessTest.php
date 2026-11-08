@@ -86,7 +86,10 @@ class BotAccessTest extends TestCase
 
         Http::assertSentCount(4);
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/sendMessage')
-            && str_contains($request['text'], 'temporarily available to staff only'));
+            && str_contains($request['text'], 'temporarily available to staff only')
+            && ($request['reply_markup']['remove_keyboard'] ?? false) === true);
+        Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/sendMessage')
+            && ! str_contains($request['text'], 'temporarily available to staff only'));
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/answerCallbackQuery')
             && $request['callback_query_id'] === 'callback1');
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/answerInlineQuery')

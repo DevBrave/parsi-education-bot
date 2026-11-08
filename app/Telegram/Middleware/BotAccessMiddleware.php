@@ -41,7 +41,11 @@ class BotAccessMiddleware
             $mention = '@'.mb_strtolower(ltrim(config('telegram.bot_username', 'parsi_politobot'), '@'));
             // Ignore unrelated group chatter while still stopping dispatch.
             if (! $isGroup || str_contains($body, $mention) || str_starts_with($body, '/search')) {
-                $this->telegram->sendMessage($message['chat']['id'], $text);
+                $this->telegram->sendMessage(
+                    $message['chat']['id'],
+                    $text,
+                    $isGroup ? null : ['remove_keyboard' => true],
+                );
             }
         }
 
