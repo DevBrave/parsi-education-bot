@@ -2,7 +2,6 @@
 
 namespace App\Telegram\Handlers;
 
-use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\User;
 use App\Services\TelegramService;
@@ -27,80 +26,12 @@ class InlineQueryHandler
         $lang = $user->preferred_language ?? 'en';
         
         $normalizedQuery = mb_strtolower($query);
-        $isShortQuery = (mb_strlen($normalizedQuery) < 3);
-        $queryKey = $isShortQuery ? 'default_latest' : md5($normalizedQuery);
+        $queryKey = $normalizedQuery === '' ? 'default_latest' : md5($normalizedQuery);
         $cacheKey = "search:inline:{$lang}:{$queryKey}";
 
-        $results = Cache::remember($cacheKey, now()->addSeconds(30), function () use ($query, $isShortQuery, $normalizedQuery, $lang) {
-            $baseQuery = Resource::with(['course', 'resourceType', 'files'])
-                ->where('status', 'approved')
-                ->orderByRaw('CASE WHEN EXISTS (SELECT 1 FROM resource_files WHERE resource_files.resource_id = resources.id) THEN 0 ELSE 1 END ASC')
-                ->latest();
-
-            if ($isShortQuery) {
-                $resources = $baseQuery->take(20)->get();
-            } else {
-                $tokens = array_filter(explode(' ', $normalizedQuery), fn($t) => mb_strlen(trim($t)) >= 1);
-                if (empty($tokens)) {
-                    $tokens = [$normalizedQuery];
-                }
-
-                // Course acronym mapping (e.g., 'os' -> Operating Systems, 'ca' -> Computer Architecture)
-                $courseAcronymMap = Cache::remember('courses:acronym_map', now()->addHours(12), function () {
-                    $map = [];
-                    foreach (\App\Models\Course::all(['id', 'name']) as $c) {
-                        $words = preg_split('/[\s\-_]+/', $c->name);
-                        $acronym = '';
-                        foreach ($words as $w) {
-                            $w = trim($w);
-                            if ($w !== '' && !in_array(strtolower($w), ['and', 'for', 'the', 'of', 'in', 'to', 'a', 'an', '&'])) {
-                                $acronym .= mb_substr($w, 0, 1);
-                            }
-                        }
-                        if (mb_strlen($acronym) >= 2) {
-                            $map[mb_strtolower($acronym)][] = $c->id;
-                        }
-                    }
-                    return $map;
-                });
-
-                foreach ($tokens as $token) {
-                    $variants = [$token];
-                    if (str_ends_with($token, 's') && mb_strlen($token) > 3) {
-                        $variants[] = rtrim($token, 's');
-                    }
-
-                    $matchingCourseIds = $courseAcronymMap[$token] ?? [];
-
-                    $baseQuery->where(function ($sub) use ($variants, $token, $matchingCourseIds) {
-                        if (!empty($matchingCourseIds)) {
-                            $sub->orWhereIn('course_id', $matchingCourseIds);
-                        }
-
-                        foreach ($variants as $v) {
-                            $sub->orWhere('title', 'like', "%{$v}%")
-                                ->orWhere('description', 'like', "%{$v}%")
-                                ->orWhereHas('course', function ($cq) use ($v, $token) {
-                                    $cq->where('name', 'like', "%{$v}%")
-                                        ->orWhere('course_code', 'like', "%{$v}%");
-                                    if (is_numeric($token)) {
-                                        $cq->orWhere('year', (int) $token);
-                                    }
-                                })
-                                ->orWhereHas('resourceType', function ($rq) use ($v) {
-                                    $rq->where('code', 'like', "%{$v}%")
-                                        ->orWhere('display_name', 'like', "%{$v}%");
-                                })
-                                ->orWhereHas('files', function ($fq) use ($v) {
-                                    $fq->where('original_filename', 'like', "%{$v}%");
-                                });
-                        }
-                    });
-                }
-
-                $resources = $baseQuery->take(20)->get();
-            }
-
+        $results = Cache::remember($cacheKey, now()->addSeconds(30), function () use ($query, $lang) {
+            $resources = app(\App\Services\ResourceSearchService::class)
+                ->query($query)->take(20)->get();
             $items = [];
             $channel = config('telegram.channel_username', 'PARSI_POLITO');
             $bot = config('telegram.bot_username', 'parsi_politobot');

@@ -283,21 +283,11 @@ class MessageHandler
             ->take(5)
             ->get();
 
-        // Search approved resources (by title, description, or course name/code)
-        $resources = Resource::where('status', 'approved')
-            ->where(function ($q) use ($query) {
-                $q->where('title', 'like', "%{$query}%")
-                    ->orWhere('description', 'like', "%{$query}%")
-                    ->orWhereHas('course', function ($cq) use ($query) {
-                        $cq->where('name', 'like', "%{$query}%")
-                            ->orWhere('course_code', 'like', "%{$query}%");
-                    });
-            })
-            ->with(['course', 'resourceType', 'files'])
-            ->latest()
-            ->take(8)
+        // Use the same matching and ordering as inline search.
+        $resources = app(\App\Services\ResourceSearchService::class)
+            ->query($query)
+            ->take(20)
             ->get();
-
         if ($courses->isEmpty() && $resources->isEmpty()) {
             $replyMarkup = $showNavigation ? [
                 'inline_keyboard' => [
