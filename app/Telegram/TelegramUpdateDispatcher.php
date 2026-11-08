@@ -93,7 +93,7 @@ class TelegramUpdateDispatcher
             return;
         }
 
-        if ($this->botAccessMiddleware->handle($payload, $user)) {
+        if (!$this->botAccessMiddleware->handle($payload, $user)) {
             return;
         }
 
