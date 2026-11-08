@@ -13,7 +13,7 @@ use Illuminate\View\View;
 
 class UserAdminController extends Controller
 {
-   
+
 
     /**
      * Display a paginated listing of users with role filtering.
@@ -105,7 +105,7 @@ class UserAdminController extends Controller
             ])],
             'program_id' => [
                 'nullable',
-                Rule::requiredIf(fn () => in_array($request->input('role'), [User::ROLE_MAJOR_ADMIN, User::ROLE_PROFESSOR], true)),
+                Rule::requiredIf(fn() => in_array($request->input('role'), [User::ROLE_MAJOR_ADMIN, User::ROLE_PROFESSOR], true)),
                 'exists:programs,id',
             ],
             'password' => ['nullable', 'string', 'min:8'],
@@ -141,7 +141,32 @@ class UserAdminController extends Controller
             ->with('success', "User '{$user->first_name} {$user->last_name}' updated successfully! Role set to {$user->role_label}.");
     }
 
-     public function setBlocked(Request $request, User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+
+        abort_unless($actor && $actor->canManageUsers(), 403);
+
+        // Prevent deleting your own account.
+        abort_if($actor->id === $user->id, 403);
+
+        if ($user->submittedResources()->exists()) {
+            return redirect()->route('admin.users.edit', $user)
+                ->withErrors(['delete' => 'This user has submitted resources and cannot be deleted. Block the user instead.']);
+        }
+
+        $userId = $user->id;
+
+        $user->delete();
+
+        log_rbac("User #{$userId} deleted", $actor, [
+            'target_user_id' => $userId,
+        ]);
+
+        return redirect()->route('admin.users.index')
+            ->with('success', 'User deleted successfully.');
+    }
+    public function setBlocked(Request $request, User $user): RedirectResponse
     {
         abort_unless($request->user()?->canManageUsers(), 403);
 

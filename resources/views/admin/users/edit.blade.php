@@ -150,8 +150,8 @@
                     </div>
                 </div>
                 <!-- 5. Web Credentials -->
-                
-                @if(!$user->isStudent())
+
+                @if (!$user->isStudent())
                     <div
                         style="border-top: 1px solid var(--border); padding-top: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
                         <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">🔑 Web Panel Login
@@ -204,6 +204,16 @@
                 @method('PATCH')
                 <input type="hidden" name="is_blocked" value="{{ $user->is_blocked ? '0' : '1' }}">
             </form>
+            @if (auth()->id() !== $user->id)
+            <form id="user-delete-form" method="POST" action="{{ route('admin.users.destroy', $user) }}"
+                onsubmit="return confirm('Permanently delete this user? This cannot be undone.');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-danger" style="padding: 0.65rem 1.5rem;">
+                    🗑️ Delete User
+                </button>
+            </form>
+            @endif
         </div>
 
     </div>
