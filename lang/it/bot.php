@@ -177,7 +177,7 @@ return [
         'no' => 'No',
     ],
     'search' => [
-        'prompt' => "🔍 <b>Cerca Materiali e Insegnamenti</b>\n\nDigita il nome del corso, codice o parola chiave (es. <i>Math/i>، <i>Physics</i>، <i>Algorithms/i>):",
+        'prompt' => "🔍 <b>Cerca Materiali e Insegnamenti</b>\n\nDigita il nome del corso, codice o parola chiave (es. <i>Math/i>، <i>Physics</i>، <i>Algorithms</i>):",
         'too_short' => '⚠️ Inserisci almeno 2 caratteri per la ricerca.',
         'no_results' => "🔍 Nessun corso o materiale trovato per '<b>:query</b>'.\n\nProva con un'altra parola chiave o sfoglia i corsi per corso di laurea.",
         'results_header' => "🔍 <b>Risultati per ':query'</b>\n\nSeleziona un corso o materiale qui sotto:",
