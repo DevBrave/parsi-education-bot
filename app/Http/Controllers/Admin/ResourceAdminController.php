@@ -107,10 +107,10 @@ class ResourceAdminController extends Controller
         $stats = [
             'total' => Resource::count(),
             'approved' => Resource::where('status', 'approved')->count(),
-            'community' => Resource::whereHas('submitter', fn ($q) => $q->where('role', '!=', 'admin'))->count(),
+            'community' => Resource::whereHas('submitter', fn ($q) => $q->where('role', '!=', User::ROLE_STUDENT))->count(),
             'official' => Resource::where(function ($q) {
                 $q->whereNull('submitted_by')
-                    ->orWhereHas('submitter', fn ($sub) => $sub->where('role', 'admin'));
+                    ->orWhereHas('submitter', fn ($sub) => $sub->where('role', '!=', User::ROLE_STUDENT));
             })->count(),
             'telegram_synced' => ResourceFile::whereNotNull('telegram_file_id')->count(),
             'drive_synced' => ResourceFile::whereNotNull('drive_file_id')->count(),
