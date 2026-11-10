@@ -96,7 +96,7 @@ class Resource extends Model
      */
     public function isCommunitySubmission(): bool
     {
-        return $this->submitted_by !== null && $this->submitter !== null && $this->submitter->role !== 'admin';
+        return $this->submitted_by !== null && $this->submitter !== null && $this->submitter->role === User::ROLE_STUDENT;
     }
 
     /**

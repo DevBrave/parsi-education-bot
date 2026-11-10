@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Resource;
 use App\Models\ResourceFile;
 use App\Models\ResourceType;
+use App\Models\User;
 use App\Services\FileSecurityService;
 use App\Services\GoogleDriveService;
 use App\Services\ResourceModerationService;
@@ -76,11 +77,11 @@ class ResourceAdminController extends Controller
 
         // 5. Source Filter (Community vs Official PARSI)
         if ($request->input('source') === 'community') {
-            $query->whereHas('submitter', fn ($q) => $q->where('role', '!=', 'admin'));
+            $query->whereHas('submitter', fn ($q) => $q->where('role', User::ROLE_STUDENT));
         } elseif ($request->input('source') === 'official') {
             $query->where(function ($q) {
-                $q->whereNull('submitted_by')
-                    ->orWhereHas('submitter', fn ($sub) => $sub->where('role', 'admin'));
+                $q->whereDoesntHave('submitter')
+                    ->orWhereHas('submitter', fn ($sub) => $sub->where('role', '!=', User::ROLE_STUDENT));
             });
         }
 
