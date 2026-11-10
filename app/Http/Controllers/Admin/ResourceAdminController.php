@@ -107,7 +107,7 @@ class ResourceAdminController extends Controller
         $stats = [
             'total' => Resource::count(),
             'approved' => Resource::where('status', 'approved')->count(),
-            'community' => Resource::whereHas('submitter', fn ($q) => $q->where('role', '!=', User::ROLE_STUDENT))->count(),
+            'community' => Resource::whereHas('submitter', fn ($q) => $q->where('role', User::ROLE_STUDENT))->count(),
             'official' => Resource::where(function ($q) {
                 $q->whereNull('submitted_by')
                     ->orWhereHas('submitter', fn ($sub) => $sub->where('role', '!=', User::ROLE_STUDENT));
