@@ -45,6 +45,7 @@
         }
     },
     "scripts": {
+        "test:login": "@php vendor/phpunit/phpunit/phpunit --group=website-login",
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

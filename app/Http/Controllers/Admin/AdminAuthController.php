@@ -103,6 +103,6 @@ class AdminAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('admin.login')->with('info', 'You have been logged out safely.');
+        return redirect()->route('home')->with('info', 'You have been logged out safely.');
     }
 }
