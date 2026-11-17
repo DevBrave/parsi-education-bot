@@ -19,7 +19,7 @@ class IsAdmin
         $user = Auth::user();
 
         if (! $user) {
-            return redirect()->guest(route('admin.login'));
+            return redirect()->guest(route('login'));
         }
 
         if (! $user->isStaff()) {

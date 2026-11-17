@@ -3,10 +3,15 @@
 use App\Http\Controllers\Admin\AcademicYearAdminController;
 use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\BotAccessController;
 use App\Http\Controllers\Admin\CourseAdminController;
+use App\Http\Controllers\Admin\LogAdminController;
 use App\Http\Controllers\Admin\ProgramAdminController;
+use App\Http\Controllers\Admin\ReportAdminController;
 use App\Http\Controllers\Admin\ResourceAdminController;
 use App\Http\Controllers\Admin\ResourceTypeAdminController;
+use App\Http\Controllers\Admin\UserAdminController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Middleware\IsAdmin;
 use Google\Client;
 use Google\Service\Drive;
@@ -18,23 +23,23 @@ Route::inertia('/', 'Welcome', [
     'telegramUrl' => 'https://t.me/'.ltrim(config('telegram.bot_username'), '@'),
 ])->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
-});
+Route::get('/login', [LoginController::class, 'show'])
+    ->middleware('guest')
+    ->name('login');
 
-// Admin Authentication (Public)
-Route::prefix('admin')->group(function () {
+// Admin authentication is restricted to authenticated staff.
+Route::middleware(['auth', IsAdmin::class])->prefix('admin')->group(function () {
     Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
     Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1')->name('admin.login.submit');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 });
 
-Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
+Route::middleware(['auth', IsAdmin::class])->prefix('admin')->group(function () {
     // 0. Dashboard
     Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
-    Route::get('/bot-access', [\App\Http\Controllers\Admin\BotAccessController::class, 'edit'])->name('admin.bot-access.edit');
-    Route::put('/bot-access', [\App\Http\Controllers\Admin\BotAccessController::class, 'update'])->name('admin.bot-access.update');
+    Route::get('/bot-access', [BotAccessController::class, 'edit'])->name('admin.bot-access.edit');
+    Route::put('/bot-access', [BotAccessController::class, 'update'])->name('admin.bot-access.update');
 
     // 1. Resources
     Route::get('/resources', [ResourceAdminController::class, 'index'])->name('admin.resources.index');
@@ -77,25 +82,25 @@ Route::middleware(IsAdmin::class)->prefix('admin')->group(function () {
     Route::delete('/resource-types/{resourceType}', [ResourceTypeAdminController::class, 'destroy'])->name('admin.resource-types.destroy');
 
     // 6. User & Role Management
-    Route::get('/users', [\App\Http\Controllers\Admin\UserAdminController::class, 'index'])->name('admin.users.index');
-    Route::get('/users/{user}/edit', [\App\Http\Controllers\Admin\UserAdminController::class, 'edit'])->name('admin.users.edit');
-    Route::put('/users/{user}', [\App\Http\Controllers\Admin\UserAdminController::class, 'update'])->name('admin.users.update');
-    Route::patch('/users/{user}/blocked', [\App\Http\Controllers\Admin\UserAdminController::class, 'setBlocked'])->name('admin.users.blocked');
-    Route::delete('/users/{user}/delete', [\App\Http\Controllers\Admin\UserAdminController::class, 'destroy'])->name('admin.users.destroy');
+    Route::get('/users', [UserAdminController::class, 'index'])->name('admin.users.index');
+    Route::get('/users/{user}/edit', [UserAdminController::class, 'edit'])->name('admin.users.edit');
+    Route::put('/users/{user}', [UserAdminController::class, 'update'])->name('admin.users.update');
+    Route::patch('/users/{user}/blocked', [UserAdminController::class, 'setBlocked'])->name('admin.users.blocked');
+    Route::delete('/users/{user}/delete', [UserAdminController::class, 'destroy'])->name('admin.users.destroy');
 
     // 7. Resource Reports
-    Route::get('/reports', [\App\Http\Controllers\Admin\ReportAdminController::class, 'index'])->name('admin.reports.index');
-    Route::get('/reports/{report}', [\App\Http\Controllers\Admin\ReportAdminController::class, 'show'])->name('admin.reports.show');
-    Route::post('/reports/{report}/resolve', [\App\Http\Controllers\Admin\ReportAdminController::class, 'resolve'])->name('admin.reports.resolve');
-    Route::post('/reports/{report}/dismiss', [\App\Http\Controllers\Admin\ReportAdminController::class, 'dismiss'])->name('admin.reports.dismiss');
-    Route::delete('/reports/{report}/resource', [\App\Http\Controllers\Admin\ReportAdminController::class, 'destroyResource'])->name('admin.reports.resource.destroy');
+    Route::get('/reports', [ReportAdminController::class, 'index'])->name('admin.reports.index');
+    Route::get('/reports/{report}', [ReportAdminController::class, 'show'])->name('admin.reports.show');
+    Route::post('/reports/{report}/resolve', [ReportAdminController::class, 'resolve'])->name('admin.reports.resolve');
+    Route::post('/reports/{report}/dismiss', [ReportAdminController::class, 'dismiss'])->name('admin.reports.dismiss');
+    Route::delete('/reports/{report}/resource', [ReportAdminController::class, 'destroyResource'])->name('admin.reports.resource.destroy');
 
     // 8. Live System Logs & Monitoring
-    Route::get('/logs', [\App\Http\Controllers\Admin\LogAdminController::class, 'index'])->name('admin.logs.index');
-    Route::get('/logs/poll', [\App\Http\Controllers\Admin\LogAdminController::class, 'poll'])->name('admin.logs.poll');
-    Route::get('/logs/stream', [\App\Http\Controllers\Admin\LogAdminController::class, 'stream'])->name('admin.logs.stream');
-    Route::get('/logs/download', [\App\Http\Controllers\Admin\LogAdminController::class, 'download'])->name('admin.logs.download');
-    Route::post('/logs/clear', [\App\Http\Controllers\Admin\LogAdminController::class, 'clear'])->name('admin.logs.clear');
+    Route::get('/logs', [LogAdminController::class, 'index'])->name('admin.logs.index');
+    Route::get('/logs/poll', [LogAdminController::class, 'poll'])->name('admin.logs.poll');
+    Route::get('/logs/stream', [LogAdminController::class, 'stream'])->name('admin.logs.stream');
+    Route::get('/logs/download', [LogAdminController::class, 'download'])->name('admin.logs.download');
+    Route::post('/logs/clear', [LogAdminController::class, 'clear'])->name('admin.logs.clear');
 });
 
 if (app()->isLocal()) {

@@ -3,116 +3,97 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('website-login')]
 class AdminAuthTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
-    public function test_admin_login_screen_can_be_rendered(): void
+    #[DataProvider('adminEndpoints')]
+    public function test_guests_are_redirected_to_the_website_login(string $method, string $route): void
     {
-        $response = $this->get(route('admin.login'));
-
-        $response->assertOk();
-        $response->assertSee('PARSI Admin');
-        $response->assertSee('Sign in to manage educational materials');
+        $this->call($method, route($route))->assertRedirect(route('login'));
     }
 
-    public function test_admin_can_authenticate_with_valid_credentials(): void
+    #[DataProvider('adminEndpoints')]
+    public function test_students_cannot_access_admin_routes(string $method, string $route): void
     {
-        $admin = User::create([
-            'first_name' => 'Sara',
-            'last_name' => 'Admin',
-            'email' => 'sara@parsi.polito.it',
-            'password' => Hash::make('secret1234'),
-            'role' => 'admin',
-        ]);
-
-        $response = $this->post(route('admin.login.submit'), [
-            'email' => 'sara@parsi.polito.it',
-            'password' => 'secret1234',
-        ]);
-
-        $response->assertRedirect(route('admin.dashboard'));
-        $this->assertAuthenticatedAs($admin);
+        $student = User::factory()->create(['role' => User::ROLE_STUDENT]);
+        $this->actingAs($student);
+        $this->call($method, route($route))->assertForbidden();
     }
 
-    public function test_admin_can_authenticate_with_username(): void
+    #[DataProvider('staffRoles')]
+    public function test_staff_can_enter_the_admin_panel_without_another_login(string $role): void
     {
-        $admin = User::create([
-            'first_name' => 'Hamid',
-            'username' => 'testadminuser',
-            'email' => 'hamid@parsi.polito.it',
-            'password' => Hash::make('secret1234'),
-            'role' => 'admin',
-        ]);
-
-        $response = $this->post(route('admin.login.submit'), [
-            'email' => 'testadminuser',
-            'password' => 'secret1234',
-        ]);
-
-        $response->assertRedirect(route('admin.dashboard'));
-        $this->assertAuthenticatedAs($admin);
+        $user = User::factory()->create(['role' => $role]);
+        $this->actingAs($user)->get(route('admin.login'))->assertRedirect(route('admin.dashboard'));
+        $this->get(route('admin.dashboard'))->assertOk();
     }
 
-    public function test_admin_cannot_authenticate_with_invalid_password(): void
+    public function test_website_login_can_continue_to_an_intended_admin_page(): void
     {
-        $admin = User::create([
-            'first_name' => 'Sara',
-            'email' => 'sara2@parsi.polito.it',
-            'password' => Hash::make('correct_password'),
-            'role' => 'admin',
-        ]);
+        $staff = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
+        $this->post(route('login.store'), ['email' => $staff->email, 'password' => 'password'])
+            ->assertRedirect(route('admin.dashboard'));
+        $this->assertAuthenticatedAs($staff);
+    }
 
-        $response = $this->post(route('admin.login.submit'), [
-            'email' => 'sara2@parsi.polito.it',
-            'password' => 'wrong_password',
-        ]);
+    public function test_unrecognized_roles_are_denied_admin_access(): void
+    {
+        $user = User::factory()->create(['role' => 'unrecognized']);
 
-        $response->assertSessionHasErrors('email');
+        $this->actingAs($user)->get(route('admin.dashboard'))->assertForbidden();
+    }
+
+    public function test_viewers_cannot_manage_users_despite_having_panel_access(): void
+    {
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+
+        $this->actingAs($viewer)->get(route('admin.dashboard'))->assertOk();
+        $this->get(route('admin.users.index'))->assertForbidden();
+    }
+
+    public function test_admin_logout_returns_home_and_removes_panel_access(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin)->post(route('admin.logout'))->assertRedirect(route('home'));
+
         $this->assertGuest();
+        $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
     }
 
-    public function test_non_admin_user_is_denied_access(): void
+    public static function adminEndpoints(): array
     {
-        $student = User::create([
-            'first_name' => 'Ali',
-            'email' => 'student@polito.it',
-            'password' => Hash::make('password123'),
-            'role' => 'student',
-        ]);
-
-        $response = $this->post(route('admin.login.submit'), [
-            'email' => 'student@polito.it',
-            'password' => 'password123',
-        ]);
-
-        $response->assertSessionHasErrors('email');
-        $this->assertGuest();
+        return [
+            'dashboard' => ['GET', 'admin.dashboard'],
+            'legacy login page' => ['GET', 'admin.login'],
+            'users' => ['GET', 'admin.users.index'],
+            'resources' => ['GET', 'admin.resources.index'],
+            'logs' => ['GET', 'admin.logs.index'],
+            'bot access settings' => ['GET', 'admin.bot-access.edit'],
+            'legacy login submission' => ['POST', 'admin.login.submit'],
+            'create resource type' => ['POST', 'admin.resource-types.store'],
+            'create course' => ['POST', 'admin.courses.store'],
+            'logout' => ['POST', 'admin.logout'],
+        ];
     }
 
-    public function test_admin_can_logout(): void
+    public static function staffRoles(): array
     {
-        $admin = User::create([
-            'first_name' => 'AdminUser',
-            'email' => 'adminuser@parsi.polito.it',
-            'password' => Hash::make('password123'),
-            'role' => 'admin',
-        ]);
-
-        $response = $this->actingAs($admin)->post(route('admin.logout'));
-
-        $response->assertRedirect(route('admin.login'));
-        $this->assertGuest();
-    }
-
-    public function test_unauthenticated_user_accessing_admin_is_redirected_to_admin_login(): void
-    {
-        $response = $this->get(route('admin.dashboard'));
-
-        $response->assertRedirect(route('admin.login'));
+        return [
+            'admin' => [User::ROLE_ADMIN],
+            'moderator' => [User::ROLE_MODERATOR],
+            'major admin' => [User::ROLE_MAJOR_ADMIN],
+            'professor' => [User::ROLE_PROFESSOR],
+            'editor' => [User::ROLE_EDITOR],
+            'viewer' => [User::ROLE_VIEWER],
+        ];
     }
 }
