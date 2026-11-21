@@ -62,8 +62,8 @@ class AdminDashboardController extends Controller
 
         // Live top courses table (always live Eloquent models with relations, never cached as objects)
         $courseStats['top_courses'] = Course::withCount('resources')
-        ->with('programs')
-        ->orderByDesc('resources_count')
+            ->with('programs')
+            ->orderByDesc('resources_count')
             ->take(6)
             ->get();
 
@@ -178,7 +178,7 @@ class AdminDashboardController extends Controller
             ->get();
 
         $typeLabels = $types->pluck('display_name')->toArray();
-        $typeData = $types->pluck('resources_count')->map(fn($v) => (int) $v)->toArray();
+        $typeData = $types->pluck('resources_count')->map(fn ($v) => (int) $v)->toArray();
 
         // 2. Student Programme Distribution Chart
         $programs = Program::withCount('users')
@@ -189,7 +189,7 @@ class AdminDashboardController extends Controller
         $programLabels = [];
         $programData = [];
         foreach ($programs as $prog) {
-            $programLabels[] = $prog->name . ($prog->degree_level ? " ({$prog->degree_level})" : '');
+            $programLabels[] = $prog->name.($prog->degree_level ? " ({$prog->degree_level})" : '');
             $programData[] = (int) $prog->users_count;
         }
 
@@ -201,7 +201,7 @@ class AdminDashboardController extends Controller
             ->reverse();
 
         $yearLabels = $years->pluck('label')->toArray();
-        $yearData = $years->pluck('resources_count')->map(fn($v) => (int) $v)->toArray();
+        $yearData = $years->pluck('resources_count')->map(fn ($v) => (int) $v)->toArray();
 
         // 4. Language Preferences
         $languageLabels = ['English (EN)', 'Italian (IT)', 'Persian (FA)'];

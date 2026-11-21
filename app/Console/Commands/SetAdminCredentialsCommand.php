@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-
 use App\Models\User;
 use App\Services\TelegramService;
 use Illuminate\Console\Command;
@@ -32,11 +31,11 @@ class SetAdminCredentialsCommand extends Command
             User::ROLE_PROFESSOR,
             User::ROLE_MAJOR_ADMIN,
             User::ROLE_STUDENT,
-            User::ROLE_VIP
+            User::ROLE_VIP,
         ];
         $role = $this->option('role');
         if ($role !== null && ! in_array($role, $roles, true)) {
-            $this->error('Invalid role. Allowed roles: ' . implode(', ', $roles));
+            $this->error('Invalid role. Allowed roles: '.implode(', ', $roles));
 
             return self::FAILURE;
         }
@@ -80,15 +79,15 @@ class SetAdminCredentialsCommand extends Command
         $password = filled($user->password) ? null : $this->generatePassword();
         $newRole = $role ?? $user->role;
         $passwordLine = $password !== null
-            ? 'Password: <code>' . e($password) . "</code>\n"
+            ? 'Password: <code>'.e($password)."</code>\n"
             : "<code>Password: unchanged. Use your existing password.</code>\n";
         $message = "<b>Your PARSI account details</b>\n\n"
-            . 'Email: <code>' . e($email) . "</code>\n"
-            . $passwordLine
-            . 'Role: ' . e($newRole) . "\n\n"
-            . '<b>Your Major: <code>' . e($user->program?->name) . "</code> (The best Major)</b>\n\n"
-            . 'Sign in: ' . e(route('admin.login')) . "\n\n"
-            . 'Please Keep these credentials private.';
+            .'Email: <code>'.e($email)."</code>\n"
+            .$passwordLine
+            .'Role: '.e($newRole)."\n\n"
+            .'<b>Your Major: <code>'.e($user->program?->name)."</code> (The best Major)</b>\n\n"
+            .'Sign in: '.e(route('admin.login'))."\n\n"
+            .'Please Keep these credentials private.';
 
         try {
             DB::transaction(function () use ($user, $email, $password, $newRole, $message, $telegram) {

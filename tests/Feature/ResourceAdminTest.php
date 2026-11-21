@@ -2,11 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\UploadResourceFileJob;
 use App\Models\Course;
 use App\Models\Resource;
+use App\Models\ResourceFile;
 use App\Models\ResourceType;
 use App\Models\User;
+use App\Services\FileSecurityService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ResourceAdminTest extends TestCase
@@ -48,8 +56,8 @@ class ResourceAdminTest extends TestCase
 
     public function test_duplicate_upload_returns_a_visible_validation_error_for_ajax_requests(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
-        $this->mock(\App\Services\FileSecurityService::class, function ($mock) {
+        Queue::fake();
+        $this->mock(FileSecurityService::class, function ($mock) {
             $mock->shouldReceive('validateUpload')->once()->andReturn(['valid' => true]);
         });
 
@@ -68,21 +76,21 @@ class ResourceAdminTest extends TestCase
             'sha256' => hash('sha256', $contents),
         ]);
         $resourceCount = Resource::count();
-        $fileCount = \App\Models\ResourceFile::count();
+        $fileCount = ResourceFile::count();
 
         $response = $this->actingAs($this->admin)->post(route('admin.resources.store'), [
             'course_id' => $this->course->id,
             'resource_type_id' => $this->resourceType->id,
             'title' => 'Duplicate material',
             'status' => 'approved',
-            'files' => [\Illuminate\Http\UploadedFile::fake()->createWithContent('duplicate.pdf', $contents)],
+            'files' => [UploadedFile::fake()->createWithContent('duplicate.pdf', $contents)],
         ], ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest']);
 
         $response->assertUnprocessable()->assertJsonValidationErrors('files');
         $response->assertJsonPath('errors.files.0', "The file 'duplicate.pdf' has already been uploaded. Please choose a different file.");
         $this->assertSame($resourceCount, Resource::count());
-        $this->assertSame($fileCount, \App\Models\ResourceFile::count());
-        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+        $this->assertSame($fileCount, ResourceFile::count());
+        Queue::assertNothingPushed();
     }
 
     public function test_student_cannot_access_resources_admin(): void
@@ -236,7 +244,7 @@ class ResourceAdminTest extends TestCase
             'submitted_by' => $this->admin->id,
         ]);
 
-        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+        Http::fake(['*' => Http::response(['ok' => true])]);
         config(['telegram.storage_channel_id' => -1009999999]);
 
         $file = $resource->files()->create([
@@ -255,7 +263,7 @@ class ResourceAdminTest extends TestCase
         $this->assertDatabaseMissing('resource_files', ['id' => $file->id]);
 
         // Verify deleteMessage was called on Telegram with the storage channel and message ID
-        \Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        Http::assertSent(function (Request $request) {
             return str_ends_with($request->url(), '/deleteMessage')
                 && (string) ($request['chat_id'] ?? null) === '-1009999999'
                 && (string) ($request['message_id'] ?? null) === '12345';
@@ -264,7 +272,7 @@ class ResourceAdminTest extends TestCase
 
     public function test_admin_can_delete_individual_file_and_it_purges_from_telegram_and_drive(): void
     {
-        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+        Http::fake(['*' => Http::response(['ok' => true])]);
         config(['telegram.storage_channel_id' => -1009999999]);
 
         $resource = Resource::create([
@@ -301,7 +309,7 @@ class ResourceAdminTest extends TestCase
         $this->assertDatabaseHas('resources', ['id' => $resource->id]);
 
         // Verify deleteMessage was called on Telegram for file1
-        \Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        Http::assertSent(function (Request $request) {
             return str_ends_with($request->url(), '/deleteMessage')
                 && (string) ($request['chat_id'] ?? null) === '-1009999999'
                 && (string) ($request['message_id'] ?? null) === '99001';
@@ -310,10 +318,10 @@ class ResourceAdminTest extends TestCase
 
     public function test_admin_can_create_resource_with_status(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
-        \Illuminate\Support\Facades\Storage::fake('local');
+        Queue::fake();
+        Storage::fake('local');
 
-        $uploadedFile = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+        $uploadedFile = UploadedFile::fake()->createWithContent(
             'sample_exam.pdf',
             "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
         );
@@ -332,14 +340,14 @@ class ResourceAdminTest extends TestCase
             'status' => 'approved',
         ]);
 
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\UploadResourceFileJob::class);
+        Queue::assertPushed(UploadResourceFileJob::class);
     }
 
     public function test_admin_editing_resource_and_adding_file_does_not_duplicate_admin_file(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
-        \Illuminate\Support\Facades\Storage::fake('local');
-        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+        Queue::fake();
+        Storage::fake('local');
+        Http::fake(['*' => Http::response(['ok' => true])]);
         config(['telegram.storage_channel_id' => -1009999999]);
 
         $student = User::firstOrNew(['telegram_user_id' => 777666]);
@@ -366,7 +374,7 @@ class ResourceAdminTest extends TestCase
             'local_path' => null,
         ]);
 
-        $adminUploadedFile = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+        $adminUploadedFile = UploadedFile::fake()->createWithContent(
             'admin_supplement.pdf',
             "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
         );
@@ -386,13 +394,13 @@ class ResourceAdminTest extends TestCase
         $this->assertEquals('approved', $resource->status);
 
         // 2. Verify admin's new file was dispatched to UploadResourceFileJob
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\UploadResourceFileJob::class, function ($job) use ($resource) {
+        Queue::assertPushed(UploadResourceFileJob::class, function ($job) use ($resource) {
             return $job->resourceFile->resource_id === $resource->id
                 && $job->resourceFile->original_filename === 'admin_supplement.pdf';
         });
 
         // 3. Verify sendToStorageChannel ONLY sent the student's file, NOT the newly attached admin file
-        \Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        Http::assertSent(function (Request $request) {
             return str_ends_with($request->url(), '/sendDocument')
                 && ($request['document'] ?? null) === 'student_tg_file_1'
                 && (string) ($request['chat_id'] ?? null) === '-1009999999';

@@ -13,8 +13,6 @@ use Illuminate\View\View;
 
 class UserAdminController extends Controller
 {
-
-
     /**
      * Display a paginated listing of users with role filtering.
      */
@@ -105,7 +103,7 @@ class UserAdminController extends Controller
             ])],
             'program_id' => [
                 'nullable',
-                Rule::requiredIf(fn() => in_array($request->input('role'), [User::ROLE_MAJOR_ADMIN, User::ROLE_PROFESSOR], true)),
+                Rule::requiredIf(fn () => in_array($request->input('role'), [User::ROLE_MAJOR_ADMIN, User::ROLE_PROFESSOR], true)),
                 'exists:programs,id',
             ],
             'password' => ['nullable', 'string', 'min:8'],
@@ -166,6 +164,7 @@ class UserAdminController extends Controller
         return redirect()->route('admin.users.index')
             ->with('success', 'User deleted successfully.');
     }
+
     public function setBlocked(Request $request, User $user): RedirectResponse
     {
         abort_unless($request->user()?->canManageUsers(), 403);

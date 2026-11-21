@@ -8,12 +8,11 @@ use App\Telegram\Handlers\CallbackQueryHandler;
 use App\Telegram\Handlers\FileUploadHandler;
 use App\Telegram\Handlers\InlineQueryHandler;
 use App\Telegram\Handlers\MessageHandler;
-use App\Telegram\Middleware\CheckUserOnboarding;
 use App\Telegram\Middleware\BotAccessMiddleware;
+use App\Telegram\Middleware\CheckUserOnboarding;
 use App\Telegram\Middleware\TelegramRateLimiter;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class TelegramUpdateDispatcher
 {
@@ -115,13 +114,13 @@ class TelegramUpdateDispatcher
             if ($message && isset($message['text'])) {
                 $text = $message['text'];
                 $botUsername = strtolower(config('telegram.bot_username', 'parsi_politobot'));
-                $isMentioned = str_contains(strtolower($text), '@' . $botUsername) || str_starts_with(strtolower($text), '/search');
+                $isMentioned = str_contains(strtolower($text), '@'.$botUsername) || str_starts_with(strtolower($text), '/search');
 
                 if (! $isMentioned) {
                     return;
                 }
 
-                $cleanText = preg_replace('/@' . preg_quote($botUsername, '/') . '\b/i', '', $text);
+                $cleanText = preg_replace('/@'.preg_quote($botUsername, '/').'\b/i', '', $text);
                 $cleanText = trim(preg_replace('/^\/search\b/i', '', trim($cleanText)));
 
                 if ($cleanText !== '') {

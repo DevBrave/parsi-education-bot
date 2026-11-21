@@ -2,8 +2,8 @@
 
 namespace Tests\Unit;
 
-use App\Models\ResourceType;
 use App\Models\Resource;
+use App\Models\ResourceType;
 use App\Telegram\Keyboards\ProgramMenuKeyboard;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;

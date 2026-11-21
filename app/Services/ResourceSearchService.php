@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Course;
 use App\Models\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,6 @@ class ResourceSearchService
             ->orderByRaw('CASE WHEN EXISTS (SELECT 1 FROM resource_files WHERE resource_files.resource_id = resources.id) THEN 0 ELSE 1 END ASC')
             ->latest();
 
-
         if ($normalizedQuery === '') {
             return $baseQuery;
         }
@@ -28,12 +28,12 @@ class ResourceSearchService
         // Course acronym mapping (e.g., 'os' -> Operating Systems, 'ca' -> Computer Architecture)
         $courseAcronymMap = Cache::remember('courses:acronym_map', now()->addHours(12), function () {
             $map = [];
-            foreach (\App\Models\Course::all(['id', 'name']) as $c) {
+            foreach (Course::all(['id', 'name']) as $c) {
                 $words = preg_split('/[\s\-_]+/', $c->name);
                 $acronym = '';
                 foreach ($words as $w) {
                     $w = trim($w);
-                    if ($w !== '' && !in_array(strtolower($w), ['and', 'for', 'the', 'of', 'in', 'to', 'a', 'an', '&'])) {
+                    if ($w !== '' && ! in_array(strtolower($w), ['and', 'for', 'the', 'of', 'in', 'to', 'a', 'an', '&'])) {
                         $acronym .= mb_substr($w, 0, 1);
                     }
                 }
@@ -41,6 +41,7 @@ class ResourceSearchService
                     $map[mb_strtolower($acronym)][] = $c->id;
                 }
             }
+
             return $map;
         });
 
@@ -53,7 +54,7 @@ class ResourceSearchService
             $matchingCourseIds = $courseAcronymMap[$token] ?? [];
 
             $baseQuery->where(function ($sub) use ($variants, $token, $matchingCourseIds) {
-                if (!empty($matchingCourseIds)) {
+                if (! empty($matchingCourseIds)) {
                     $sub->orWhereIn('course_id', $matchingCourseIds);
                 }
 
@@ -77,7 +78,6 @@ class ResourceSearchService
                 }
             });
         }
-
 
         return $baseQuery;
     }

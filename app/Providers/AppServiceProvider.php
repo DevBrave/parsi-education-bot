@@ -4,10 +4,11 @@ namespace App\Providers;
 
 use App\Auth\TelegramGuard;
 use App\Models\User;
+use App\Services\TelegramService;
 use Carbon\CarbonImmutable;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -21,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
     {
         require_once app_path('helpers.php');
 
-        $this->app->singleton(\App\Services\TelegramService::class);
+        $this->app->singleton(TelegramService::class);
     }
 
     /**
@@ -42,9 +43,6 @@ class AppServiceProvider extends ServiceProvider
                 $app['request'],
             );
         });
-
-
-
 
         // // In local dev, auto-login as the first admin user for convenience.
         // if (app()->isLocal()) {
@@ -67,13 +65,13 @@ class AppServiceProvider extends ServiceProvider
         );
 
         Password::defaults(
-            fn(): ?Password => app()->isProduction()
+            fn (): ?Password => app()->isProduction()
                 ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
+                    ->mixedCase()
+                    ->letters()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised()
                 : null,
         );
     }

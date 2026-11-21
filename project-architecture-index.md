@@ -17,43 +17,52 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## .npmrc
 
 ## app/Actions/Fortify/CreateNewUser.php
+
 - class CreateNewUser
 - function create(
 
 ## app/Actions/Fortify/ResetUserPassword.php
+
 - class ResetUserPassword
 - function reset(
 
 ## app/Auth/TelegramGuard.php
+
 - class TelegramGuard
 - function __construct(
 - function user(
 - function validate(
 
 ## app/Concerns/PasswordValidationRules.php
+
 - trait PasswordValidationRules
 - function passwordRules(
 - function currentPasswordRules(
 
 ## app/Concerns/ProfileValidationRules.php
+
 - trait ProfileValidationRules
 - function profileRules(
 - function nameRules(
 - function emailRules(
 
 ## app/Console/Commands/SetAdminCredentialsCommand.php
+
 - class SetAdminCredentialsCommand
 - function handle(
 
 ## app/Console/Commands/TelegramSetWebhook.php
+
 - class TelegramSetWebhook
 - function handle(
 
 ## app/helpers.php
+
 - function bot_log(
 - function log_rbac(
 
 ## app/Http/Controllers/Admin/AcademicYearAdminController.php
+
 - class AcademicYearAdminController
 - function index(
 - function store(
@@ -63,12 +72,14 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function destroy(
 
 ## app/Http/Controllers/Admin/AdminAuthController.php
+
 - class AdminAuthController
 - function showLoginForm(
 - function login(
 - function logout(
 
 ## app/Http/Controllers/Admin/AdminDashboardController.php
+
 - class AdminDashboardController
 - function index(
 - function getUserStats(
@@ -79,6 +90,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function formatBytes(
 
 ## app/Http/Controllers/Admin/CourseAdminController.php
+
 - class CourseAdminController
 - function index(
 - function store(
@@ -87,6 +99,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function destroy(
 
 ## app/Http/Controllers/Admin/LogAdminController.php
+
 - class LogAdminController
 - function index(
 - function poll(
@@ -99,6 +112,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function formatBytes(
 
 ## app/Http/Controllers/Admin/ProgramAdminController.php
+
 - class ProgramAdminController
 - function index(
 - function store(
@@ -107,6 +121,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function destroy(
 
 ## app/Http/Controllers/Admin/ReportAdminController.php
+
 - class ReportAdminController
 - function index(
 - function show(
@@ -115,6 +130,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function destroyResource(
 
 ## app/Http/Controllers/Admin/ResourceAdminController.php
+
 - class ResourceAdminController
 - function index(
 - function create(
@@ -127,6 +143,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function syncDrive(
 
 ## app/Http/Controllers/Admin/ResourceTypeAdminController.php
+
 - class ResourceTypeAdminController
 - function index(
 - function store(
@@ -135,26 +152,31 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function destroy(
 
 ## app/Http/Controllers/Admin/UserAdminController.php
+
 - class UserAdminController
 - function index(
 - function edit(
 - function update(
 
 ## app/Http/Controllers/Controller.php
+
 - abstract class Controller
 
 ## app/Http/Controllers/Settings/ProfileController.php
+
 - class ProfileController
 - function edit(
 - function update(
 - function destroy(
 
 ## app/Http/Controllers/Settings/SecurityController.php
+
 - class SecurityController
 - function edit(
 - function update(
 
 ## app/Http/Controllers/TelegramWebhookController.php
+
 - class TelegramWebhookController
 - function __construct(
 - function handle(
@@ -162,49 +184,60 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function handleCallbackQuery(
 
 ## app/Http/Middleware/EnsureTelegramTokenIsValid.php
+
 - class EnsureTelegramTokenIsValid
 - function handle(
 
 ## app/Http/Middleware/HandleAppearance.php
+
 - class HandleAppearance
 - function handle(
 
 ## app/Http/Middleware/HandleInertiaRequests.php
+
 - class HandleInertiaRequests
 - function version(
 - function share(
 
 ## app/Http/Middleware/IsAdmin.php
+
 - class IsAdmin
 - function handle(
 
 ## app/Http/Requests/Settings/PasswordUpdateRequest.php
+
 - class PasswordUpdateRequest
 - function rules(
 
 ## app/Http/Requests/Settings/ProfileDeleteRequest.php
+
 - class ProfileDeleteRequest
 - function rules(
 
 ## app/Http/Requests/Settings/ProfileUpdateRequest.php
+
 - class ProfileUpdateRequest
 - function rules(
 
 ## app/Http/Requests/Settings/TwoFactorAuthenticationRequest.php
+
 - class TwoFactorAuthenticationRequest
 - function rules(
 
 ## app/Jobs/FinalizeSubmissionJob.php
+
 - class FinalizeSubmissionJob
 - function __construct(
 - function handle(
 
 ## app/Jobs/ProcessTelegramUpdate.php
+
 - class ProcessTelegramUpdate
 - function __construct(
 - function handle(
 
 ## app/Jobs/UploadResourceFileJob.php
+
 - class UploadResourceFileJob
 - function __construct(
 - function handle(
@@ -212,11 +245,13 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function uniqueId(
 
 ## app/Models/AcademicYear.php
+
 - class AcademicYear
 - function casts(
 - function resources(
 
 ## app/Models/Course.php
+
 - class Course
 - function booted(
 - function clearCourseCaches(
@@ -227,10 +262,12 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function getYearLabelAttribute(
 
 ## app/Models/Professor.php
+
 - class Professor
 - function resources(
 
 ## app/Models/Program.php
+
 - class Program
 - function booted(
 - function courses(
@@ -240,6 +277,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function casts(
 
 ## app/Models/Resource.php
+
 - class Resource
 - function booted(
 - function course(
@@ -254,12 +292,14 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function buildTelegramCaption(
 
 ## app/Models/ResourceFile.php
+
 - class ResourceFile
 - function resource(
 - function reports(
 - function getFormattedSizeAttribute(
 
 ## app/Models/ResourceReport.php
+
 - class ResourceReport
 - function casts(
 - function user(
@@ -273,12 +313,14 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function getReasonLabelAttribute(
 
 ## app/Models/ResourceType.php
+
 - class ResourceType
 - function booted(
 - function casts(
 - function resources(
 
 ## app/Models/Track.php
+
 - class Track
 - function booted(
 - function program(
@@ -287,6 +329,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function casts(
 
 ## app/Models/User.php
+
 - class User
 - function casts(
 - function booted(
@@ -316,12 +359,14 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function getRoleLabelAttribute(
 
 ## app/Providers/AppServiceProvider.php
+
 - class AppServiceProvider
 - function register(
 - function boot(
 - function configureDefaults(
 
 ## app/Providers/FortifyServiceProvider.php
+
 - class FortifyServiceProvider
 - function register(
 - function boot(
@@ -330,6 +375,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function configureRateLimiting(
 
 ## app/Services/FileSecurityService.php
+
 - class FileSecurityService
 - function allowedMimesString(
 - function validateUpload(
@@ -340,6 +386,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function scanWithClamAv(
 
 ## app/Services/GoogleDriveService.php
+
 - class GoogleDriveService
 - function __construct(
 - function initialize(
@@ -351,6 +398,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function log(
 
 ## app/Services/ResourceModerationService.php
+
 - class ResourceModerationService
 - function __construct(
 - function approve(
@@ -360,6 +408,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function sendToStorageChannel(
 
 ## app/Services/ResourceUploadService.php
+
 - class ResourceUploadService
 - function __construct(
 - function sync(
@@ -368,6 +417,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function uploadToGoogleDrive(
 
 ## app/Services/TelegramService.php
+
 - class TelegramService
 - function __construct(
 - function client(
@@ -389,6 +439,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function log(
 
 ## app/Telegram/Handlers/CallbackQueryHandler.php
+
 - class CallbackQueryHandler
 - function __construct(
 - function handle(
@@ -413,6 +464,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function handleFinishUpload(
 
 ## app/Telegram/Handlers/FileUploadHandler.php
+
 - class FileUploadHandler
 - function __construct(
 - function handle(
@@ -422,6 +474,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function extractFileInfo(
 
 ## app/Telegram/Handlers/InlineQueryHandler.php
+
 - class InlineQueryHandler
 - function __construct(
 - function handle(
@@ -429,6 +482,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function convertToArticleFallback(
 
 ## app/Telegram/Handlers/MessageHandler.php
+
 - class MessageHandler
 - function __construct(
 - function handle(
@@ -448,6 +502,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function sendAboutUsMenu(
 
 ## app/Telegram/Handlers/OnboardingHandler.php
+
 - class OnboardingHandler
 - function __construct(
 - function handle(
@@ -463,10 +518,12 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function finishOnboarding(
 
 ## app/Telegram/Keyboards/MainMenuKeyboard.php
+
 - class MainMenuKeyboard
 - function build(
 
 ## app/Telegram/Keyboards/OnboardingKeyboard.php
+
 - class OnboardingKeyboard
 - function languages(
 - function degrees(
@@ -475,6 +532,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function programmes(
 
 ## app/Telegram/Keyboards/ProgramMenuKeyboard.php
+
 - class ProgramMenuKeyboard
 - function educationHub(
 - function programmes(
@@ -501,16 +559,19 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function aboutMembersMenu(
 
 ## app/Telegram/Middleware/CheckUserOnboarding.php
+
 - class CheckUserOnboarding
 - function __construct(
 - function handle(
 
 ## app/Telegram/Middleware/TelegramRateLimiter.php
+
 - class TelegramRateLimiter
 - function __construct(
 - function handle(
 
 ## app/Telegram/TelegramUpdateDispatcher.php
+
 - class TelegramUpdateDispatcher
 - function __construct(
 - function dispatch(
@@ -558,124 +619,154 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## database/.gitignore
 
 ## database/factories/UserFactory.php
+
 - class UserFactory
 - function definition(
 - function unverified(
 - function withTwoFactor(
 
 ## database/migrations/0001_01_01_000000_create_users_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/0001_01_01_000001_create_cache_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/0001_01_01_000002_create_jobs_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2024_01_01_000000_create_passkeys_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_185144_create_programs_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_185654_create_academic_years_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_190011_create_professors_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_190201_create_resource_types_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_190440_create_courses_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_01_192355_create_course_program_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_02_114105_create_resources_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_02_154237_create_professor_resource_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_09_02_160034_create_resource_files_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_08_230433_add_program_id_to_users_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_15_021500_add_year_to_courses_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_15_033000_add_local_path_to_resource_files_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_15_043000_create_resource_reports_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_18_181500_add_telegram_message_id_to_resource_files_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_18_194500_add_downloads_and_inline_shares_to_resources_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_19_122526_add_auth_columns_to_users_table.php
+
 - function up(
 - function down(
 
 ## database/migrations/2026_10_27_200000_create_tracks_and_course_track_tables.php
+
 - function up(
 - function down(
 
 ## database/seeders/AcademicYearSeeder.php
+
 - class AcademicYearSeeder
 - function run(
 
 ## database/seeders/CatalogueSeeder.php
+
 - class CatalogueSeeder
 - function run(
 
 ## database/seeders/CompleteCatalogSeeder.php
+
 - class CompleteCatalogSeeder
 - function run(
 
 ## database/seeders/CourseYearSeeder.php
+
 - class CourseYearSeeder
 - function run(
 
 ## database/seeders/DatabaseSeeder.php
+
 - class DatabaseSeeder
 - function run(
 
 ## database/seeders/MasterTrackSeeder.php
+
 - class MasterTrackSeeder
 - function run(
 
 ## database/seeders/ResourceTypeSeeder.php
+
 - class ResourceTypeSeeder
 - function run(
 
 ## database/seeders/TestResourceSeeder.php
+
 - class TestResourceSeeder
 - function run(
 
@@ -816,6 +907,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/components/ui/breadcrumb/index.ts
 
 ## resources/js/components/ui/button/Button.vue
+
 - interface Props
 
 ## resources/js/components/ui/button/index.ts
@@ -971,6 +1063,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/components/ui/sheet/SheetClose.vue
 
 ## resources/js/components/ui/sheet/SheetContent.vue
+
 - interface SheetContentProps
 
 ## resources/js/components/ui/sheet/SheetDescription.vue
@@ -1028,6 +1121,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/components/ui/sidebar/SidebarMenuSubItem.vue
 
 ## resources/js/components/ui/sidebar/SidebarProvider.vue
+
 - function setOpen(
 - function setOpenMobile(
 - function toggleSidebar(
@@ -1043,6 +1137,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/components/ui/skeleton/index.ts
 
 ## resources/js/components/ui/skeleton/Skeleton.vue
+
 - interface SkeletonProps
 
 ## resources/js/components/ui/sonner/index.ts
@@ -1068,18 +1163,21 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/components/UserMenuContent.vue
 
 ## resources/js/composables/useAppearance.ts
+
 - function updateTheme(
 - function initializeTheme(
 - function useAppearance(
 - function updateAppearance(
 
 ## resources/js/composables/useCurrentUrl.ts
+
 - function useCurrentUrl(
 - function isCurrentUrl(
 - function isCurrentOrParentUrl(
 - function whenCurrentUrl(
 
 ## resources/js/composables/useInitials.ts
+
 - function getInitial(
 - function getInitials(
 - function useInitials(
@@ -1103,9 +1201,11 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/layouts/settings/Layout.vue
 
 ## resources/js/lib/flashToast.ts
+
 - function initializeFlashToast(
 
 ## resources/js/lib/utils.ts
+
 - function cn(
 - function toUrl(
 
@@ -1136,6 +1236,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/js/types/auth.ts
 
 ## resources/js/types/global.d.ts
+
 - interface ImportMetaEnv
 - interface ImportMeta
 - interface ComponentCustomProperties
@@ -1155,10 +1256,12 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/views/admin/auth/login.blade.php
 
 ## resources/views/admin/courses/edit.blade.php
+
 - function syncSpecializationTracks(
 - function filterProgramsByDegreeLevel(
 
 ## resources/views/admin/courses/index.blade.php
+
 - function syncSpecializationTracks(
 - function filterProgramsByDegreeLevel(
 
@@ -1167,6 +1270,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/views/admin/layout.blade.php
 
 ## resources/views/admin/logs/index.blade.php
+
 - function scrollToBottom(
 - function fetchLogs(
 - function startPolling(
@@ -1180,9 +1284,11 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/views/admin/partials/pagination.blade.php
 
 ## resources/views/admin/programs/edit.blade.php
+
 - function updateTracksVisibility(
 
 ## resources/views/admin/programs/index.blade.php
+
 - function updateTracksVisibility(
 
 ## resources/views/admin/reports/index.blade.php
@@ -1190,9 +1296,11 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/views/admin/reports/show.blade.php
 
 ## resources/views/admin/resources/create.blade.php
+
 - function updateFileName(
 
 ## resources/views/admin/resources/edit.blade.php
+
 - function updateFileNames(
 
 ## resources/views/admin/resources/index.blade.php
@@ -1202,6 +1310,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## resources/views/admin/resource-types/index.blade.php
 
 ## resources/views/admin/users/edit.blade.php
+
 - function updateProgramVisibility(
 
 ## resources/views/admin/users/index.blade.php
@@ -1219,6 +1328,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 ## routes/web.php
 
 ## tests/Feature/AdminAuthTest.php
+
 - class AdminAuthTest
 - function test_admin_login_screen_can_be_rendered(
 - function test_admin_can_authenticate_with_valid_credentials(
@@ -1229,6 +1339,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_unauthenticated_user_accessing_admin_is_redirected_to_admin_login(
 
 ## tests/Feature/AdminTracksFeatureTest.php
+
 - class AdminTracksFeatureTest
 - function setUp(
 - function test_courses_index_page_renders_degree_level_and_tracks_sections(
@@ -1240,6 +1351,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_programs_update_to_bachelor_clears_tracks(
 
 ## tests/Feature/Auth/AuthenticationTest.php
+
 - class AuthenticationTest
 - function test_login_screen_can_be_rendered(
 - function test_users_can_authenticate_using_the_login_screen(
@@ -1249,6 +1361,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_users_are_rate_limited(
 
 ## tests/Feature/Auth/EmailVerificationTest.php
+
 - class EmailVerificationTest
 - function setUp(
 - function test_email_verification_screen_can_be_rendered(
@@ -1259,11 +1372,13 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_already_verified_user_visiting_verification_link_is_redirected_without_firing_event_again(
 
 ## tests/Feature/Auth/PasswordConfirmationTest.php
+
 - class PasswordConfirmationTest
 - function test_confirm_password_screen_can_be_rendered(
 - function test_password_confirmation_requires_authentication(
 
 ## tests/Feature/Auth/PasswordResetTest.php
+
 - class PasswordResetTest
 - function setUp(
 - function test_reset_password_link_screen_can_be_rendered(
@@ -1273,34 +1388,40 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_password_cannot_be_reset_with_invalid_token(
 
 ## tests/Feature/Auth/RegistrationTest.php
+
 - class RegistrationTest
 - function setUp(
 - function test_registration_screen_can_be_rendered(
 - function test_new_users_can_register(
 
 ## tests/Feature/Auth/TwoFactorChallengeTest.php
+
 - class TwoFactorChallengeTest
 - function setUp(
 - function test_two_factor_challenge_redirects_to_login_when_not_authenticated(
 - function test_two_factor_challenge_can_be_rendered(
 
 ## tests/Feature/Auth/VerificationNotificationTest.php
+
 - class VerificationNotificationTest
 - function setUp(
 - function test_sends_verification_notification(
 - function test_does_not_send_verification_notification_if_email_is_verified(
 
 ## tests/Feature/DashboardTest.php
+
 - class DashboardTest
 - function test_guests_are_redirected_to_the_login_page(
 - function test_authenticated_admin_can_visit_the_dashboard(
 - function test_dashboard_caches_heavy_metrics_and_supports_refresh(
 
 ## tests/Feature/ExampleTest.php
+
 - class ExampleTest
 - function test_returns_a_successful_response(
 
 ## tests/Feature/LogAdminTest.php
+
 - class LogAdminTest
 - function setUp(
 - function test_guest_is_redirected_to_login(
@@ -1314,6 +1435,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_student_cannot_poll_logs(
 
 ## tests/Feature/MasterTrackTest.php
+
 - class MasterTrackTest
 - function test_master_track_seeder_creates_msc_program_and_seven_tracks(
 - function test_program_with_tracks_shows_track_menu_on_selection(
@@ -1323,6 +1445,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function invokeHandler(
 
 ## tests/Feature/OnboardingMiddlewareTest.php
+
 - class OnboardingMiddlewareTest
 - function setUp(
 - function test_new_user_without_language_is_prompted_for_language(
@@ -1331,6 +1454,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_fully_onboarded_user_bypasses_onboarding(
 
 ## tests/Feature/ReportAdminTest.php
+
 - class ReportAdminTest
 - function setUp(
 - function test_admin_can_view_reports_index_and_details(
@@ -1342,6 +1466,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_destroy_resource_deletes_only_reported_file_when_other_files_exist(
 
 ## tests/Feature/ResourceAdminTest.php
+
 - class ResourceAdminTest
 - function setUp(
 - function test_guests_cannot_access_resources_admin(
@@ -1356,6 +1481,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_admin_editing_resource_and_adding_file_does_not_duplicate_admin_file(
 
 ## tests/Feature/SecurityFuzzTest.php
+
 - class SecurityFuzzTest
 - function setUp(
 - function test_webhook_rejects_missing_secret_token_when_configured(
@@ -1369,6 +1495,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function invokeHandler(
 
 ## tests/Feature/Settings/ProfileUpdateTest.php
+
 - class ProfileUpdateTest
 - function test_profile_page_is_displayed(
 - function test_profile_information_can_be_updated(
@@ -1377,6 +1504,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_correct_password_must_be_provided_to_delete_account(
 
 ## tests/Feature/Settings/SecurityTest.php
+
 - class SecurityTest
 - function test_security_page_is_displayed(
 - function test_security_page_requires_password_confirmation_when_enabled(
@@ -1385,6 +1513,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_correct_password_must_be_provided_to_update_password(
 
 ## tests/Feature/TelegramDocumentTest.php
+
 - class TelegramDocumentTest
 - function test_document_is_sent_using_the_telegram_file_id(
 - function test_telegram_failure_is_logged_and_returned(
@@ -1397,6 +1526,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_submission_multi_file_updates_single_feedback_message(
 
 ## tests/Feature/TelegramGroupSearchTest.php
+
 - class TelegramGroupSearchTest
 - function setUp(
 - function test_group_mention_triggers_search_without_back_navigation(
@@ -1404,6 +1534,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_chosen_inline_result_increments_downloads_and_inline_shares_count(
 
 ## tests/Feature/TelegramMenuTest.php
+
 - class TelegramMenuTest
 - function test_start_shows_a_persistent_reply_keyboard_and_escapes_the_name(
 - function test_back_to_main_closes_the_inline_menu_and_restores_the_reply_keyboard(
@@ -1419,6 +1550,7 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function invokeHandler(
 
 ## tests/Feature/UserRolesTest.php
+
 - class UserRolesTest
 - function setUp(
 - function test_admin_can_access_user_management(
@@ -1432,14 +1564,17 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_major_admin_is_restricted_to_their_major(
 
 ## tests/TestCase.php
+
 - abstract class TestCase
 - function skipUnlessFortifyHas(
 
 ## tests/Unit/ExampleTest.php
+
 - class ExampleTest
 - function test_that_true_is_true(
 
 ## tests/Unit/GoogleDriveServiceTest.php
+
 - class GoogleDriveServiceTest
 - function test_oauth_failure_does_not_fall_back_to_service_account(
 - function __construct(
@@ -1451,22 +1586,24 @@ Generated from the working tree on 2026-11-03. Excludes installed dependencies, 
 - function test_upload_file_returns_null_for_nonexistent_file(
 
 ## tests/Unit/ResourceCaptionTest.php
+
 - class ResourceCaptionTest
 - function test_build_telegram_caption_without_description(
 - function test_build_telegram_caption_with_description(
 - function test_build_telegram_caption_with_suffix_and_middle_section(
 
 ## tests/Unit/ResourceUploadStatusTest.php
+
 - class ResourceUploadStatusTest
 - function languages(
 - function test_drive_only_upload_posts_download_link_to_telegram_channel(
 - function test_telegram_status_is_saved_before_drive_starts(
 
 ## tests/Unit/TelegramUploadTest.php
+
 - class TelegramUploadTest
 - function test_small_document_uses_cloud_endpoint_and_short_timeout(
 
 ## tsconfig.json
 
 ## vite.config.ts
-

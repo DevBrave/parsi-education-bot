@@ -10,7 +10,6 @@ use App\Models\ResourceFile;
 use App\Models\ResourceType;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class CompleteCatalogSeeder extends Seeder
 {

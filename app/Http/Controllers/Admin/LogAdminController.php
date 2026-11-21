@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -69,20 +68,18 @@ class LogAdminController extends Controller
         if (! array_key_exists($activeChannel, $this->channels)) {
             $activeChannel = 'master';
         }
-        
+
         $logPath = $this->resolveLogPath($activeChannel);
         $initialLines = [];
         $fileSizeFormatted = '0 KB';
         $fileSizeBytes = 0;
-        
+
         if (File::exists($logPath)) {
             $fileSizeBytes = File::size($logPath);
             $fileSizeFormatted = $this->formatBytes($fileSizeBytes);
             $initialLines = $this->readLastLines($logPath, 150);
         }
 
-       
-        
         // Compute size stats for all channels
         $channelStats = [];
         foreach ($this->channels as $key => $meta) {
@@ -211,15 +208,17 @@ class LogAdminController extends Controller
             }
 
             if (! File::exists($logPath)) {
-                echo "data: " . json_encode(['empty' => true, 'message' => 'Log file does not exist yet.']) . "\n\n";
+                echo 'data: '.json_encode(['empty' => true, 'message' => 'Log file does not exist yet.'])."\n\n";
                 flush();
+
                 return;
             }
 
             $handle = fopen($logPath, 'r');
             if (! $handle) {
-                echo "data: " . json_encode(['error' => 'Unable to read log file.']) . "\n\n";
+                echo 'data: '.json_encode(['error' => 'Unable to read log file.'])."\n\n";
                 flush();
+
                 return;
             }
 
@@ -228,7 +227,7 @@ class LogAdminController extends Controller
             $lastPos = ftell($handle);
 
             // Send initial ping
-            echo "event: connected\ndata: " . json_encode(['status' => 'connected', 'channel' => basename($logPath)]) . "\n\n";
+            echo "event: connected\ndata: ".json_encode(['status' => 'connected', 'channel' => basename($logPath)])."\n\n";
             flush();
 
             $timeout = time() + 300; // Stream up to 5 minutes per connection
@@ -245,14 +244,14 @@ class LogAdminController extends Controller
                     // Log file was truncated / cleared
                     fseek($handle, 0, SEEK_SET);
                     $lastPos = 0;
-                    echo "event: cleared\ndata: " . json_encode(['status' => 'log_cleared']) . "\n\n";
+                    echo "event: cleared\ndata: ".json_encode(['status' => 'log_cleared'])."\n\n";
                     flush();
                 } elseif ($currentSize > $lastPos) {
                     fseek($handle, $lastPos);
                     while (($rawLine = fgets($handle)) !== false) {
                         $parsed = $this->parseLogLine($rawLine);
                         if ($parsed) {
-                            echo "data: " . json_encode($parsed) . "\n\n";
+                            echo 'data: '.json_encode($parsed)."\n\n";
                             flush();
                         }
                     }
@@ -292,7 +291,7 @@ class LogAdminController extends Controller
             abort(404, 'Log file not found.');
         }
 
-        $downloadName = "parsi_polito_{$channel}_" . date('Y-m-d_His') . ".log";
+        $downloadName = "parsi_polito_{$channel}_".date('Y-m-d_His').'.log';
 
         return response()->download($logPath, $downloadName, [
             'Content-Type' => 'text/plain',
@@ -329,7 +328,7 @@ class LogAdminController extends Controller
         }
 
         // Daily rotating channel: check today's file first, e.g. telegram-2026-10-20.log
-        $todayFile = storage_path("logs/{$channel}-" . date('Y-m-d') . ".log");
+        $todayFile = storage_path("logs/{$channel}-".date('Y-m-d').'.log');
         if (File::exists($todayFile)) {
             return $todayFile;
         }
@@ -351,28 +350,28 @@ class LogAdminController extends Controller
         if (! File::exists($filepath) || File::size($filepath) === 0) {
             return [];
         }
-        
+
         $handle = fopen($filepath, 'r');
         $lines = [];
         $buffer = '';
         $chunkSize = 4096;
-        
+
         fseek($handle, 0, SEEK_END);
         $fileSize = ftell($handle);
         $pos = $fileSize;
-        
+
         while ($pos > 0 && count($lines) < $maxLines) {
             $readSize = min($chunkSize, $pos);
             $pos -= $readSize;
             fseek($handle, $pos);
-            
+
             $chunk = fread($handle, $readSize);
-            $buffer = $chunk . $buffer;
-            
+            $buffer = $chunk.$buffer;
+
             $splitLines = explode("\n", $buffer);
             // Keep the first partial line in buffer for the next chunk
             $buffer = array_shift($splitLines);
-            
+
             while (! empty($splitLines) && count($lines) < $maxLines) {
                 $line = array_pop($splitLines);
                 $parsed = $this->parseLogLine($line);
@@ -381,9 +380,8 @@ class LogAdminController extends Controller
                 }
             }
         }
-        
-        fclose($handle);
 
+        fclose($handle);
 
         // Reverse to preserve chronological order (oldest to newest)
         return array_reverse($lines);
@@ -444,6 +442,6 @@ class LogAdminController extends Controller
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
-        return round($bytes, $precision) . ' ' . $units[$pow];
+        return round($bytes, $precision).' '.$units[$pow];
     }
 }

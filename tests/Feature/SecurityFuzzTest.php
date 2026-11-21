@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\TelegramWebhookController;
-use App\Models\Course;
-use App\Models\Resource;
+use App\Jobs\ProcessTelegramUpdate;
 use App\Models\User;
+use Illuminate\Cache\RateLimiter;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -93,7 +93,7 @@ class SecurityFuzzTest extends TestCase
         foreach ($fuzzPayloads as $payload) {
             $response = $this->withHeaders($headers)->postJson('/api/telegram/webhook', $payload);
             // Must return 204 No Content without crashing with 500 error
-            $this->assertContains($response->status(), [204, 200], 'Webhook crashed on fuzz payload: ' . json_encode($payload));
+            $this->assertContains($response->status(), [204, 200], 'Webhook crashed on fuzz payload: '.json_encode($payload));
         }
     }
 
@@ -104,10 +104,10 @@ class SecurityFuzzTest extends TestCase
 
         $maliciousQueries = [
             "' OR '1'='1",
-            "1; DROP TABLE courses; --",
+            '1; DROP TABLE courses; --',
             "<script>alert('xss')</script>",
-            "UNION SELECT null, username, password FROM users --",
-            str_repeat("A", 1000),
+            'UNION SELECT null, username, password FROM users --',
+            str_repeat('A', 1000),
             "\x00\x01\x02\x03",
         ];
 
@@ -127,7 +127,7 @@ class SecurityFuzzTest extends TestCase
         for ($i = 0; $i < 10; $i++) {
             $this->post(route('admin.login.submit'), [
                 'email' => 'wrong_admin@example.com',
-                'password' => 'wrong_password_' . $i,
+                'password' => 'wrong_password_'.$i,
             ]);
         }
 
@@ -142,7 +142,7 @@ class SecurityFuzzTest extends TestCase
 
     public function test_rate_limiter_class_fuzzing_and_thresholds(): void
     {
-        $limiter = app(\Illuminate\Cache\RateLimiter::class);
+        $limiter = app(RateLimiter::class);
 
         // 1. Threshold verification: 100 requests limit
         $standardKey = 'user_rate_test_key_100';
@@ -188,8 +188,8 @@ class SecurityFuzzTest extends TestCase
 
     public function test_burst_fuzz_production_queued_200_requests_within_30_seconds(): void
     {
-        \Illuminate\Support\Facades\Queue::fake([
-            \App\Jobs\ProcessTelegramUpdate::class,
+        Queue::fake([
+            ProcessTelegramUpdate::class,
         ]);
 
         Config::set('telegram.webhook_secret', 'burst_secret_key');
@@ -233,7 +233,7 @@ class SecurityFuzzTest extends TestCase
                     'update_id' => 400000 + $i,
                     'message' => [
                         'chat' => ['id' => 1000 + ($i % 20)],
-                        'text' => str_repeat("fuzz_boundary_", 20) . "\x00<test>",
+                        'text' => str_repeat('fuzz_boundary_', 20)."\x00<test>",
                     ],
                 ],
             };

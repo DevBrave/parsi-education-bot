@@ -8,7 +8,6 @@ use App\Models\Resource;
 use App\Models\ResourceType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class ProgramMenuKeyboard
 {
@@ -72,11 +71,10 @@ class ProgramMenuKeyboard
         return ['inline_keyboard' => $rows];
     }
 
-
     /**
      * Build inline keyboard of active degree levels (BSc, MSc, etc.).
      */
-    public static function degrees(string $lang = 'en', ?string $backCallback = null): array
+    public static function degrees(string $lang = 'en', ?string $backCallback = null, string $degreePrefix = 'select_degree_'): array
     {
         $lang = $lang ?: 'en';
         // 1. Pluck returns a clean collection of strings: ['BSc', 'MSc']
@@ -103,7 +101,7 @@ class ProgramMenuKeyboard
             $buttons[] = [
                 [
                     'text' => "🎓 {$degreeStr}",
-                    'callback_data' => "select_degree_{$degreeStr}",
+                    'callback_data' => $degreePrefix.$degreeStr,
                 ],
             ];
         }
@@ -128,8 +126,12 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of programs belonging to a specific degree level.
      */
-    public static function programsByDegree(string $degreeLevel, string $lang = 'en', string $backCallback = 'back_to_degrees'): array
-    {
+    public static function programsByDegree(
+        string $degreeLevel,
+        string $lang = 'en',
+        string $backCallback = 'back_to_degrees',
+        string $programPrefix = 'select_program_'
+    ): array {
         $lang = $lang ?: 'en';
         $cacheKey = "catalog:programs:degree_{$degreeLevel}";
 
@@ -153,7 +155,7 @@ class ProgramMenuKeyboard
             $buttons[] = [
                 [
                     'text' => "📘 {$program->name}",
-                    'callback_data' => "select_program_{$program->id}",
+                    'callback_data' => $programPrefix.$program->id,
                 ],
             ];
         }
@@ -211,7 +213,7 @@ class ProgramMenuKeyboard
             ['text' => __('bot.tracks.all_tracks', [], $lang), 'callback_data' => $allTracksCallback],
         ];
 
-        $backText = str_starts_with($backCallback, 'select_degree_')
+        $backText = preg_match('/^(select|browse|submit)_degree_/', $backCallback)
             ? (__('bot.tracks.back_to_programs', [], $lang) ?: '⬅️ Back to Programs')
             : __('bot.courses.change_program', [], $lang);
 
@@ -270,8 +272,8 @@ class ProgramMenuKeyboard
             }
 
             $key = "year_{$year}";
-            $yearLabel = __('bot.courses.' . $key, [], $lang);
-            if ($yearLabel === 'bot.courses.' . $key) {
+            $yearLabel = __('bot.courses.'.$key, [], $lang);
+            if ($yearLabel === 'bot.courses.'.$key) {
                 $yearLabel = "Year {$year}";
             }
 
@@ -304,7 +306,7 @@ class ProgramMenuKeyboard
         }
 
         $buttons[] = [
-            ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
+            ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => $forSubmission ? 'edu_submit_program' : 'change_program'],
         ];
 
         if ($backCallback) {
@@ -328,7 +330,7 @@ class ProgramMenuKeyboard
     {
         $lang = $lang ?: 'en';
         // Cache all courses for this program, track, and year for 24 hours as scalar array
-        $trackSuffix = $trackId ? ":track_{$trackId}" : ":track_all";
+        $trackSuffix = $trackId ? ":track_{$trackId}" : ':track_all';
         $cacheKey = "catalog:courses:program_{$program->id}{$trackSuffix}:year_{$year}";
         $allCourses = Cache::remember($cacheKey, now()->addDay(), function () use ($program, $year, $trackId) {
             $query = $program->courses()->where('is_active', true)->orderBy('name');
@@ -336,7 +338,7 @@ class ProgramMenuKeyboard
             if ($trackId) {
                 $query->where(function ($q) use ($trackId) {
                     $q->whereDoesntHave('tracks')
-                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                        ->orWhereHas('tracks', fn ($t) => $t->where('tracks.id', $trackId));
                 });
             }
 
@@ -353,7 +355,7 @@ class ProgramMenuKeyboard
             if ($trackId) {
                 $query->where(function ($q) use ($trackId) {
                     $q->whereDoesntHave('tracks')
-                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                        ->orWhereHas('tracks', fn ($t) => $t->where('tracks.id', $trackId));
                 });
             }
             if ($year !== 'all' && is_numeric($year)) {
@@ -403,8 +405,8 @@ class ProgramMenuKeyboard
                     ];
                 }
 
-                $yearLabel = __('bot.courses.year_' . $currentYear, [], $lang);
-                if ($yearLabel === 'bot.courses.year_' . $currentYear) {
+                $yearLabel = __('bot.courses.year_'.$currentYear, [], $lang);
+                if ($yearLabel === 'bot.courses.year_'.$currentYear) {
                     $yearLabel = "Year {$currentYear}";
                 }
 
@@ -427,7 +429,7 @@ class ProgramMenuKeyboard
             if ($currentPage > 1) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.prev_page', [], $lang),
-                    'callback_data' => "course_year_{$program->id}_{$year}_" . ($currentPage - 1),
+                    'callback_data' => "course_year_{$program->id}_{$year}_".($currentPage - 1),
                 ];
             }
 
@@ -439,7 +441,7 @@ class ProgramMenuKeyboard
             if ($currentPage < $totalPages) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.next_page', [], $lang),
-                    'callback_data' => "course_year_{$program->id}_{$year}_" . ($currentPage + 1),
+                    'callback_data' => "course_year_{$program->id}_{$year}_".($currentPage + 1),
                 ];
             }
 
@@ -474,7 +476,7 @@ class ProgramMenuKeyboard
     {
         $lang = $lang ?: 'en';
         // Cache all courses for this program, track, and year for 24 hours
-        $trackSuffix = $trackId ? ":track_{$trackId}" : ":track_all";
+        $trackSuffix = $trackId ? ":track_{$trackId}" : ':track_all';
         $cacheKey = "catalog:courses:program_{$program->id}{$trackSuffix}:year_{$year}";
         $allCourses = Cache::remember($cacheKey, now()->addDay(), function () use ($program, $year, $trackId) {
             $query = $program->courses()->where('is_active', true)->orderBy('name');
@@ -482,7 +484,7 @@ class ProgramMenuKeyboard
             if ($trackId) {
                 $query->where(function ($q) use ($trackId) {
                     $q->whereDoesntHave('tracks')
-                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                        ->orWhereHas('tracks', fn ($t) => $t->where('tracks.id', $trackId));
                 });
             }
 
@@ -499,7 +501,7 @@ class ProgramMenuKeyboard
             if ($trackId) {
                 $query->where(function ($q) use ($trackId) {
                     $q->whereDoesntHave('tracks')
-                        ->orWhereHas('tracks', fn($t) => $t->where('tracks.id', $trackId));
+                        ->orWhereHas('tracks', fn ($t) => $t->where('tracks.id', $trackId));
                 });
             }
             if ($year !== 'all' && is_numeric($year)) {
@@ -549,8 +551,8 @@ class ProgramMenuKeyboard
                     ];
                 }
 
-                $yearLabel = __('bot.courses.year_' . $currentYear, [], $lang);
-                if ($yearLabel === 'bot.courses.year_' . $currentYear) {
+                $yearLabel = __('bot.courses.year_'.$currentYear, [], $lang);
+                if ($yearLabel === 'bot.courses.year_'.$currentYear) {
                     $yearLabel = "Year {$currentYear}";
                 }
 
@@ -573,7 +575,7 @@ class ProgramMenuKeyboard
             if ($currentPage > 1) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.prev_page', [], $lang),
-                    'callback_data' => "submit_year_{$program->id}_{$year}_" . ($currentPage - 1),
+                    'callback_data' => "submit_year_{$program->id}_{$year}_".($currentPage - 1),
                 ];
             }
 
@@ -585,7 +587,7 @@ class ProgramMenuKeyboard
             if ($currentPage < $totalPages) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.next_page', [], $lang),
-                    'callback_data' => "submit_year_{$program->id}_{$year}_" . ($currentPage + 1),
+                    'callback_data' => "submit_year_{$program->id}_{$year}_".($currentPage + 1),
                 ];
             }
 
@@ -745,7 +747,7 @@ class ProgramMenuKeyboard
             if ($currentPage > 1) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.prev_page', [], $lang),
-                    'callback_data' => "res_page_{$resourceTypeId}_{$courseId}_{$programId}_{$year}_" . ($currentPage - 1),
+                    'callback_data' => "res_page_{$resourceTypeId}_{$courseId}_{$programId}_{$year}_".($currentPage - 1),
                 ];
             }
 
@@ -757,7 +759,7 @@ class ProgramMenuKeyboard
             if ($currentPage < $totalPages) {
                 $paginationRow[] = [
                     'text' => __('bot.courses.next_page', [], $lang),
-                    'callback_data' => "res_page_{$resourceTypeId}_{$courseId}_{$programId}_{$year}_" . ($currentPage + 1),
+                    'callback_data' => "res_page_{$resourceTypeId}_{$courseId}_{$programId}_{$year}_".($currentPage + 1),
                 ];
             }
 
@@ -906,12 +908,12 @@ class ProgramMenuKeyboard
                     ['text' => __('bot.contact.send_message_btn', [], $lang), 'callback_data' => 'contact_prompt'],
                 ],
                 [
-                    ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
+                    ['text' => __('bot.contact.channel_btn', [], $lang), 'url' => 'https://t.me/'.ltrim($channel, '@')],
                 ],
                 [
-                    ['text' => __('bot.contact.email_btn', [], $lang),  'url' => 'https://mail.google.com/mail/?view=cm&' . http_build_query([
+                    ['text' => __('bot.contact.email_btn', [], $lang),  'url' => 'https://mail.google.com/mail/?view=cm&'.http_build_query([
                         'to' => config('telegram.email_address'),
-                    ]),],
+                    ]), ],
                 ],
             ],
         ];
@@ -980,10 +982,10 @@ class ProgramMenuKeyboard
                     ['text' => __('bot.about.members_btn', [], $lang), 'callback_data' => 'about_members'],
                 ],
                 [
-                    ['text' => __('bot.about.channel_btn', [], $lang), 'url' => 'https://t.me/' . ltrim($channel, '@')],
+                    ['text' => __('bot.about.channel_btn', [], $lang), 'url' => 'https://t.me/'.ltrim($channel, '@')],
                 ],
                 [
-                    ['text' => __('bot.about.insta_btn', [], $lang), 'url' => str_starts_with($instagram_page, 'http') ? $instagram_page : 'https://www.instagram.com/' . ltrim($instagram_page, '@/ ')],
+                    ['text' => __('bot.about.insta_btn', [], $lang), 'url' => str_starts_with($instagram_page, 'http') ? $instagram_page : 'https://www.instagram.com/'.ltrim($instagram_page, '@/ ')],
                 ],
             ],
         ];

@@ -14,8 +14,11 @@ class LogAdminTest extends TestCase
     use DatabaseTransactions;
 
     protected User $admin;
+
     protected User $moderator;
+
     protected User $viewer;
+
     protected User $student;
 
     protected function setUp(): void
@@ -127,7 +130,7 @@ class LogAdminTest extends TestCase
 
     public function test_parse_log_line_extracts_structured_data(): void
     {
-        $controller = new LogAdminController();
+        $controller = new LogAdminController;
 
         $line = '[2026-10-20 12:34:56] local.ERROR: Telegram webhook failed {"chat_id":12345,"reason":"blocked"}';
         $parsed = $controller->parseLogLine($line);

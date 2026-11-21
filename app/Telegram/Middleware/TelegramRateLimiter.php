@@ -16,8 +16,8 @@ class TelegramRateLimiter
     /**
      * Determine whether the incoming Telegram update should be throttled.
      *
-     * @param array $payload The raw Telegram webhook update payload
-     * @param User $user The resolved Telegram user model
+     * @param  array  $payload  The raw Telegram webhook update payload
+     * @param  User  $user  The resolved Telegram user model
      * @return bool True if throttled (stop processing), false to continue
      */
     public function handle(array $payload, User $user): bool
@@ -50,10 +50,12 @@ class TelegramRateLimiter
                 );
 
                 bot_log('rbac')->warning("User #{$user->id} ({$user->telegram_user_id}) exceeded hourly upload limit.");
+
                 return true;
             }
 
             RateLimiter::hit($key, $decaySeconds);
+
             return false;
         }
 
@@ -73,10 +75,12 @@ class TelegramRateLimiter
                 }
 
                 bot_log('rbac')->warning("User #{$user->id} ({$user->telegram_user_id}) throttled for rapid button clicks.");
+
                 return true;
             }
 
             RateLimiter::hit($key, $decaySeconds);
+
             return false;
         }
 
@@ -104,10 +108,12 @@ class TelegramRateLimiter
                 }
 
                 bot_log('rbac')->warning("User #{$user->id} ({$user->telegram_user_id}) throttled for rapid text messages.");
+
                 return true;
             }
 
             RateLimiter::hit($key, $decaySeconds);
+
             return false;
         }
 

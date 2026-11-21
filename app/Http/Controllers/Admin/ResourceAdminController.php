@@ -118,7 +118,7 @@ class ResourceAdminController extends Controller
         ];
 
         $courseQuery = Course::where('is_active', true)->orderBy('name');
-        
+
         if ($user && $user->isProfessor() && $user->program_id) {
             $courseQuery->whereHas('programs', function ($q) use ($user) {
                 $q->where('programs.id', $user->program_id);
@@ -158,8 +158,8 @@ class ResourceAdminController extends Controller
             $programId = $user->program_id;
             $courseQuery->whereHas('programs', fn ($q) => $q->where('programs.id', $programId));
         }
-        if($user && $user->isAdmin() && $user->program_id){
-            $courseQuery->with('programs'); 
+        if ($user && $user->isAdmin() && $user->program_id) {
+            $courseQuery->with('programs');
         }
         $courses = $courseQuery->get();
         $resourcesTypes = ResourceType::where('is_active', true)->orderBy('sort_order')->get();
@@ -169,7 +169,7 @@ class ResourceAdminController extends Controller
             'courses' => $courses,
             'resourceTypes' => $resourcesTypes,
             'academicYears' => $academicYears,
-            'user' => $user
+            'user' => $user,
         ]);
     }
 

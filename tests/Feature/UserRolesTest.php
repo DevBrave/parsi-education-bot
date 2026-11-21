@@ -16,16 +16,27 @@ class UserRolesTest extends TestCase
     use DatabaseTransactions;
 
     protected User $admin;
+
     protected User $editor;
+
     protected User $viewer;
+
     protected User $profCompEng;
+
     protected User $student;
+
     protected Program $progCompEng;
+
     protected Program $progMechEng;
+
     protected Course $courseCompEng;
+
     protected Course $courseMechEng;
+
     protected ResourceType $resourceType;
+
     protected Resource $resCompEng;
+
     protected Resource $resMechEng;
 
     protected function setUp(): void

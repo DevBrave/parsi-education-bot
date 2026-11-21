@@ -5,11 +5,14 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Program;
 use App\Models\Resource;
+use App\Models\ResourceFile;
 use App\Models\ResourceReport;
 use App\Models\ResourceType;
 use App\Models\User;
 use App\Telegram\Handlers\CallbackQueryHandler;
+use App\Telegram\Handlers\MessageHandler;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -18,15 +21,25 @@ class ReportAdminTest extends TestCase
     use DatabaseTransactions;
 
     protected User $admin;
+
     protected User $moderator;
+
     protected User $profCompEng;
+
     protected User $viewer;
+
     protected User $student;
+
     protected Program $progCompEng;
+
     protected Program $progMechEng;
+
     protected Course $courseCompEng;
+
     protected Course $courseMechEng;
+
     protected Resource $resCompEng;
+
     protected Resource $resMechEng;
 
     protected function setUp(): void
@@ -229,7 +242,7 @@ class ReportAdminTest extends TestCase
 
     public function test_telegram_student_reporting_flow(): void
     {
-        $file = \App\Models\ResourceFile::create([
+        $file = ResourceFile::create([
             'resource_id' => $this->resCompEng->id,
             'original_filename' => 'CorruptedNetworks.pdf',
             'mime_type' => 'application/pdf',
@@ -272,7 +285,7 @@ class ReportAdminTest extends TestCase
 
     public function test_telegram_contact_report_menu_and_feedback_flow(): void
     {
-        $msgHandler = app(\App\Telegram\Handlers\MessageHandler::class);
+        $msgHandler = app(MessageHandler::class);
 
         // 1. Student taps "⚠️ Contact / Report"
         $msgHandler->handle([
@@ -291,7 +304,7 @@ class ReportAdminTest extends TestCase
             ],
         ], $this->student);
 
-        $this->assertEquals('awaiting_contact_message', \Illuminate\Support\Facades\Cache::get("user_contact_state:{$this->student->id}")['step'] ?? null);
+        $this->assertEquals('awaiting_contact_message', Cache::get("user_contact_state:{$this->student->id}")['step'] ?? null);
 
         // 3. Student submits feedback text
         $msgHandler->handle([
@@ -299,12 +312,12 @@ class ReportAdminTest extends TestCase
             'text' => 'Hello team, the new bot search feature is amazing!',
         ], $this->student);
 
-        $this->assertNull(\Illuminate\Support\Facades\Cache::get("user_contact_state:{$this->student->id}"));
+        $this->assertNull(Cache::get("user_contact_state:{$this->student->id}"));
     }
 
     public function test_destroy_resource_deletes_only_reported_file_when_other_files_exist(): void
     {
-        $file1 = \App\Models\ResourceFile::create([
+        $file1 = ResourceFile::create([
             'resource_id' => $this->resCompEng->id,
             'original_filename' => 'BadFile.pdf',
             'mime_type' => 'application/pdf',
@@ -312,7 +325,7 @@ class ReportAdminTest extends TestCase
             'sha256' => hash('sha256', 'bad1'),
         ]);
 
-        $file2 = \App\Models\ResourceFile::create([
+        $file2 = ResourceFile::create([
             'resource_id' => $this->resCompEng->id,
             'original_filename' => 'GoodFile.pdf',
             'mime_type' => 'application/pdf',

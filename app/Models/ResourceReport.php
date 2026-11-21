@@ -36,13 +36,19 @@ use Illuminate\Support\Carbon;
 class ResourceReport extends Model
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_RESOLVED = 'resolved';
+
     public const STATUS_DISMISSED = 'dismissed';
 
     public const REASON_CORRUPTED = 'corrupted';
+
     public const REASON_WRONG_COURSE = 'wrong_course';
+
     public const REASON_POOR_QUALITY = 'poor_quality';
+
     public const REASON_COPYRIGHT = 'copyright';
+
     public const REASON_OTHER = 'other';
 
     protected function casts(): array
@@ -94,6 +100,7 @@ class ResourceReport extends Model
     {
         if ($user && $user->isProfessor() && $user->program_id) {
             $programId = $user->program_id;
+
             return $query->whereHas('resource.course.programs', function ($q) use ($programId) {
                 $q->where('programs.id', $programId);
             });

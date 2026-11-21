@@ -10,8 +10,10 @@ use App\Models\ResourceType;
 use App\Models\User;
 use App\Services\TelegramService;
 use App\Telegram\Handlers\CallbackQueryHandler;
+use App\Telegram\Handlers\FileUploadHandler;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -195,12 +197,12 @@ class TelegramDocumentTest extends TestCase
         );
 
         // Simulate user selected course and specified title
-        \Illuminate\Support\Facades\Cache::put("user_upload_state:{$user->id}", [
+        Cache::put("user_upload_state:{$user->id}", [
             'course_id' => $course->id,
             'title' => '20250127',
         ], now()->addMinutes(5));
 
-        $uploadHandler = app(\App\Telegram\Handlers\FileUploadHandler::class);
+        $uploadHandler = app(FileUploadHandler::class);
 
         // 1. First file arrives WITHOUT caption
         $uploadHandler->handle([
@@ -214,7 +216,7 @@ class TelegramDocumentTest extends TestCase
             ],
         ], $user);
 
-        $state = \Illuminate\Support\Facades\Cache::get("user_upload_state:{$user->id}");
+        $state = Cache::get("user_upload_state:{$user->id}");
         $this->assertNotNull($state['resource_id'] ?? null);
         $resource = Resource::with('files')->find($state['resource_id']);
         $this->assertEquals('20250127', $resource->title);
@@ -255,12 +257,12 @@ class TelegramDocumentTest extends TestCase
         );
 
         // 1. User starts submission session by choosing course and title
-        \Illuminate\Support\Facades\Cache::put("user_upload_state:{$user->id}", [
+        Cache::put("user_upload_state:{$user->id}", [
             'course_id' => $course->id,
             'title' => '📚 Complete Algorithms 2025 Notes',
         ], now()->addMinutes(5));
 
-        $uploadHandler = app(\App\Telegram\Handlers\FileUploadHandler::class);
+        $uploadHandler = app(FileUploadHandler::class);
         $mediaGroupId = 'album_group_987654321';
 
         // 2. File 1 of album arrives (Telegram sends it without caption)
@@ -291,7 +293,7 @@ class TelegramDocumentTest extends TestCase
             'caption' => $albumCaption,
         ], $user);
 
-        $state = \Illuminate\Support\Facades\Cache::get("user_upload_state:{$user->id}");
+        $state = Cache::get("user_upload_state:{$user->id}");
         $resource = Resource::with('files')->find($state['resource_id']);
 
         // Assert Title is the first line of the caption
@@ -301,7 +303,7 @@ class TelegramDocumentTest extends TestCase
         $this->assertCount(2, $resource->files);
 
         // 4. User finishes the upload (taps Done)
-        $callbackHandler = app(\App\Telegram\Handlers\CallbackQueryHandler::class);
+        $callbackHandler = app(CallbackQueryHandler::class);
         $callbackHandler->handle([
             'id' => 'cb_finish_test',
             'data' => 'finish_upload',
@@ -311,6 +313,7 @@ class TelegramDocumentTest extends TestCase
         // 5. Inspect what Telegram API received for the admin notification
         $adminTelegramRequests = Http::recorded(function (Request $request) {
             $data = $request->data();
+
             return isset($data['chat_id']) && (string) $data['chat_id'] === '-1001234567890';
         });
 
@@ -318,6 +321,7 @@ class TelegramDocumentTest extends TestCase
 
         $adminMessages = $adminTelegramRequests->map(function ($pair) {
             $data = $pair[0]->data();
+
             return $data['caption'] ?? $data['text'] ?? '';
         })->implode("\n");
 
@@ -326,13 +330,13 @@ class TelegramDocumentTest extends TestCase
         $this->assertStringContainsString('algorithms_lecture_part1.pdf', $adminMessages);
         $this->assertStringContainsString('algorithms_lecture_part2.pdf', $adminMessages);
 
-        echo PHP_EOL . "--- RESULT OF ALBUM UPLOAD TEST ---" . PHP_EOL;
-        echo "Extracted Resource Title: " . $resource->title . PHP_EOL;
-        echo "Extracted Resource Description: " . $resource->description . PHP_EOL;
-        echo "Total Attached Files: " . $resource->files->count() . PHP_EOL;
-        echo "Telegram Channel/Admin Notification:" . PHP_EOL;
-        echo $adminMessages . PHP_EOL;
-        echo "-----------------------------------" . PHP_EOL;
+        echo PHP_EOL.'--- RESULT OF ALBUM UPLOAD TEST ---'.PHP_EOL;
+        echo 'Extracted Resource Title: '.$resource->title.PHP_EOL;
+        echo 'Extracted Resource Description: '.$resource->description.PHP_EOL;
+        echo 'Total Attached Files: '.$resource->files->count().PHP_EOL;
+        echo 'Telegram Channel/Admin Notification:'.PHP_EOL;
+        echo $adminMessages.PHP_EOL;
+        echo '-----------------------------------'.PHP_EOL;
     }
 
     public function test_admin_approval_and_rejection_via_telegram_notifies_student_in_their_language(): void
@@ -388,6 +392,7 @@ class TelegramDocumentTest extends TestCase
         // Verify student received the localized approval notification
         Http::assertSent(function (Request $request) use ($student) {
             $data = $request->data();
+
             return isset($data['chat_id'])
                 && (int) $data['chat_id'] === $student->telegram_user_id
                 && str_contains($data['text'] ?? '', 'خبر خوب');
@@ -418,6 +423,7 @@ class TelegramDocumentTest extends TestCase
         // Verify student received the rejection notification
         Http::assertSent(function (Request $request) use ($student) {
             $data = $request->data();
+
             return isset($data['chat_id'])
                 && (int) $data['chat_id'] === $student->telegram_user_id
                 && str_contains($data['text'] ?? '', 'اطلاعیه فایل ارسالی');
@@ -477,7 +483,7 @@ class TelegramDocumentTest extends TestCase
         ], $student);
 
         // Verify state is stored in cache with step awaiting_title and resource_type_id set
-        $state = \Illuminate\Support\Facades\Cache::get("user_upload_state:{$student->id}");
+        $state = Cache::get("user_upload_state:{$student->id}");
         $this->assertNotNull($state);
         $this->assertEquals($course->id, $state['course_id']);
         $this->assertEquals($pastExamType->id, $state['resource_type_id']);
@@ -501,13 +507,13 @@ class TelegramDocumentTest extends TestCase
             ['first_name' => 'SecStudent', 'preferred_language' => 'en']
         );
 
-        \Illuminate\Support\Facades\Cache::put("user_upload_state:{$student->id}", [
+        Cache::put("user_upload_state:{$student->id}", [
             'course_id' => $course->id,
             'title' => 'Security Lab Report',
             'step' => 'awaiting_file',
         ], now()->addMinutes(10));
 
-        $uploadHandler = app(\App\Telegram\Handlers\FileUploadHandler::class);
+        $uploadHandler = app(FileUploadHandler::class);
 
         // 1. First file arrives
         $uploadHandler->handle([
@@ -526,7 +532,7 @@ class TelegramDocumentTest extends TestCase
             && (int) $request['chat_id'] === 999888);
 
         // Check that state has feedback_message_id = 8888
-        $state = \Illuminate\Support\Facades\Cache::get("user_upload_state:{$student->id}");
+        $state = Cache::get("user_upload_state:{$student->id}");
         $this->assertEquals(8888, $state['feedback_message_id'] ?? null);
 
         // 2. Second file arrives in the same session
@@ -547,5 +553,3 @@ class TelegramDocumentTest extends TestCase
             && (int) $request['message_id'] === 8888);
     }
 }
-
-
