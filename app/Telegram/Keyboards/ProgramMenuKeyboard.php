@@ -76,7 +76,7 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of active degree levels (BSc, MSc, etc.).
      */
-    public static function degrees(string $lang = 'en', ?string $backCallback = null): array
+    public static function degrees(string $lang = 'en', ?string $backCallback = null, string $degreePrefix = 'select_degree_'): array
     {
         $lang = $lang ?: 'en';
         // 1. Pluck returns a clean collection of strings: ['BSc', 'MSc']
@@ -103,7 +103,7 @@ class ProgramMenuKeyboard
             $buttons[] = [
                 [
                     'text' => "🎓 {$degreeStr}",
-                    'callback_data' => "select_degree_{$degreeStr}",
+                    'callback_data' => $degreePrefix . $degreeStr,
                 ],
             ];
         }
@@ -128,8 +128,12 @@ class ProgramMenuKeyboard
     /**
      * Build inline keyboard of programs belonging to a specific degree level.
      */
-    public static function programsByDegree(string $degreeLevel, string $lang = 'en', string $backCallback = 'back_to_degrees'): array
-    {
+    public static function programsByDegree(
+        string $degreeLevel,
+        string $lang = 'en',
+        string $backCallback = 'back_to_degrees',
+        string $programPrefix = 'select_program_'
+    ): array {
         $lang = $lang ?: 'en';
         $cacheKey = "catalog:programs:degree_{$degreeLevel}";
 
@@ -153,7 +157,7 @@ class ProgramMenuKeyboard
             $buttons[] = [
                 [
                     'text' => "📘 {$program->name}",
-                    'callback_data' => "select_program_{$program->id}",
+                    'callback_data' => $programPrefix . $program->id,
                 ],
             ];
         }
@@ -211,7 +215,7 @@ class ProgramMenuKeyboard
             ['text' => __('bot.tracks.all_tracks', [], $lang), 'callback_data' => $allTracksCallback],
         ];
 
-        $backText = str_starts_with($backCallback, 'select_degree_')
+        $backText = preg_match('/^(select|browse|submit)_degree_/', $backCallback)
             ? (__('bot.tracks.back_to_programs', [], $lang) ?: '⬅️ Back to Programs')
             : __('bot.courses.change_program', [], $lang);
 
@@ -304,7 +308,7 @@ class ProgramMenuKeyboard
         }
 
         $buttons[] = [
-            ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => 'change_program'],
+            ['text' => __('bot.courses.change_program', [], $lang), 'callback_data' => $forSubmission ? 'edu_submit_program' : 'change_program'],
         ];
 
         if ($backCallback) {
