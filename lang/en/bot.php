@@ -3,41 +3,41 @@
 return [
     'onboarding' => [
         'language_prompt' => "🌐 <b>Welcome to PARSI PoliTo Bot </b>\n\n"
-            . "Please select your preferred language:\n"
-            . "Seleziona la tua lingua preferita:\n"
-            . 'لطفاً زبان مورد نظر خود را انتخاب کنید:',
+            ."Please select your preferred language:\n"
+            ."Seleziona la tua lingua preferita:\n"
+            .'لطفاً زبان مورد نظر خود را انتخاب کنید:',
         'program_prompt' => "🎓 <b>Select your Degree Programme</b>\n\n"
-            . 'Please choose your study track at Politecnico di Torino to customize your course catalog:',
+            .'Please choose your study track at Politecnico di Torino to customize your course catalog:',
         'degree_prompt' => "🎓 <b>Select Degree Level</b>\n\n"
-            . "Please select your degree level :",
+            .'Please select your degree level :',
         'programs_by_degree_prompt' => "📚 <b>Select Programme (:degree)</b>\n\n"
-            . "Please choose your study programme:",
+            .'Please choose your study programme:',
         'back_degrees' => '⬅️ Back to Degree Levels',
         'completed' => "🎉 <b>Setup complete, :name </b>\n\n"
-            . 'You can change your language in Settings.',
+            .'You can change your language in Settings.',
         'ready' => 'What would you like to do?',
     ],
     'menu' => [
         'welcome' => "👋 <b>Welcome  to PARSI Education Bot, :name </b>\n\n"
-            . "PARSI Student Association is here to support you with educational materials, student services, and university guides.\n\n"
-            . 'What service would you like to use today?',
-        'choose_option' => "Please choose an option from the menu below, or send /start.",
+            ."PARSI Student Association is here to support you with educational materials, student services, and university guides.\n\n"
+            .'What service would you like to use today?',
+        'choose_option' => 'Please choose an option from the menu below, or send /start.',
         'closed' => "<b>:lastSection</b>\n\nMenu closed.",
         'default_section' => 'Menu',
     ],
     'settings' => [
         'title' => "⚙️ <b>Settings</b>\n\n"
-            . "Current Language: <b>:lang</b>\n"
-            . "Current Degree: <b>:program</b>\n\n"
-            . 'What would you like to update?',
+            ."Current Language: <b>:lang</b>\n"
+            ."Current Degree: <b>:program</b>\n\n"
+            .'What would you like to update?',
         'not_selected' => 'Not selected',
         'change_language' => '🌐 Change Language',
         'change_program' => '🎓 Change Degree Programme',
         'back_settings' => '⬅️ Back to Settings',
         'change_language_prompt' => "🌐 <b>Select Preferred Language</b>\n\n"
-            . "Please select your preferred language:\n"
-            . "Seleziona la tua lingua preferita:\n"
-            . 'لطفاً زبان مورد نظر خود را انتخاب کنید:',
+            ."Please select your preferred language:\n"
+            ."Seleziona la tua lingua preferita:\n"
+            .'لطفاً زبان مورد نظر خود را انتخاب کنید:',
         'change_program_prompt' => "🔄 <b>Select Degree Programme</b>\n\nChoose a programme to switch to:",
     ],
     'sections' => [
@@ -57,21 +57,21 @@ return [
     ],
     'report' => [
         'title' => "⚠️ <b>Report & Support Center</b>\n\n"
-            . "Please let us know if you encountered an issue with any course file or if you would like to report something to the PARSI team:\n\n"
-            . "• To report an incorrect or damaged course material, search for it and tap <b>Report</b>.\n"
-            . "• To send a report or feedback to administrators, tap <b>Send Report Message</b>.",
+            ."Please let us know if you encountered an issue with any course file or if you would like to report something to the PARSI team:\n\n"
+            ."• To report an incorrect or damaged course material, search for it and tap <b>Report</b>.\n"
+            .'• To send a report or feedback to administrators, tap <b>Send Report Message</b>.',
         'hub_text' => "⚠️ <b>Report & Support Center</b>\n\n"
-            . "Please let us know if you encountered an issue with any course file or if you would like to report something to the PARSI team:\n\n"
-            . "• To report an incorrect or damaged course material, search for it and tap <b>Report</b>.\n"
-            . "• To send a report or feedback to administrators, tap <b>Send Report Message</b>.",
-        
+            ."Please let us know if you encountered an issue with any course file or if you would like to report something to the PARSI team:\n\n"
+            ."• To report an incorrect or damaged course material, search for it and tap <b>Report</b>.\n"
+            .'• To send a report or feedback to administrators, tap <b>Send Report Message</b>.',
+
         'report_material_btn' => '🔍 Search Material to Report',
         'send_report_btn' => '📝 Send Report to Admins',
     ],
     'tutorials' => [
         'title' => "📑 <b>PARSI Educational Guides & Tutorials</b>\n\n"
-            . "Explore step-by-step guides and tutorials prepared by the PARSI student association for Politecnico di Torino students.\n\n"
-            . "Select a guide below to open the corresponding file/post:",
+            ."Explore step-by-step guides and tutorials prepared by the PARSI student association for Politecnico di Torino students.\n\n"
+            .'Select a guide below to open the corresponding file/post:',
         'edisu_btn' => '🏛️ EDISU Scholarship & Housing Guide',
         'enrollment_btn' => '🎓 Enrollment & Visa Guide',
         'didattica_btn' => '💻 Portale della Didattica Tutorial',
@@ -80,35 +80,35 @@ return [
     ],
     'education_hub' => [
         'title' => "📚 <b>Study Resources</b>\n\n"
-            . "Welcome to the PARSI academic repository for Politecnico di Torino.\n\n"
-            . "Here you can explore verified course materials, search across all subjects, or contribute past exams and notes for fellow students \n\n"
-            . "What would you like to do?",
+            ."Welcome to the PARSI academic repository for Politecnico di Torino.\n\n"
+            ."Here you can explore verified course materials, search across all subjects, or contribute past exams and notes for fellow students \n\n"
+            .'What would you like to do?',
         'browse_btn' => '📚 View Courses & Materials',
         'search_btn' => '🔍 Search Materials',
         'submit_btn' => '📤 Submit Material',
     ],
     'submit_material' => [
         'prompt' => "📤 <b>Contribute Study Material</b>\n\n"
-            . "Help fellow PoliTo students by submitting past exams, lecture notes, summaries, or exercises \n\n"
-            . "To submit:\n"
-            . "1. Tap <b>📚 Study Resources</b>\n"
-            . "2. Choose your Degree & Course\n"
-            . "3. Tap <b>📤 Submit Material for this Course</b>\n\n"
-            . 'The Education Committee admins will review, verify, and publish your material  🎓',
+            ."Help fellow PoliTo students by submitting past exams, lecture notes, summaries, or exercises \n\n"
+            ."To submit:\n"
+            ."1. Tap <b>📚 Study Resources</b>\n"
+            ."2. Choose your Degree & Course\n"
+            ."3. Tap <b>📤 Submit Material for this Course</b>\n\n"
+            .'The Education Committee admins will review, verify, and publish your material  🎓',
         'choose_course' => "📤 <b>Submit Material</b> — 🎓 <b>:program</b>\n\nSelect the course you want to submit material for:",
         'choose_type' => "📤 <b>Submit Material</b> — 📚 <b>:course</b>\n\nChoose the type of material you want to submit:",
         'course_prompt' => "📤 <b>Submit Material for :course</b>\n\n"
-            . "Thank you for contributing to PARSI PoliTo \n\n"
-            . "📝 Please send a title for this material first, then you can upload your file(s).\n\n"
-            . 'The Education Committee admins will review and publish your submission  🎓',
+            ."Thank you for contributing to PARSI PoliTo \n\n"
+            ."📝 Please send a title for this material first, then you can upload your file(s).\n\n"
+            .'The Education Committee admins will review and publish your submission  🎓',
         'file_received' => "📥 Received: <b>:filename</b>\n📁 Total files: <b>:count</b>\n\n💡 You can send more files for this material, or tap <b>Done Uploading</b> below when finished.",
         'finish_button' => '✅ Done Uploading (:count)',
         'success' => "✅ <b>Thank you </b>\n\n"
-            . "Your material for <b>:course</b> (:count file(s)) has been received and submitted for review.\n"
-            . 'Once verified by our committee, it will be published for all students  🎓',
+            ."Your material for <b>:course</b> (:count file(s)) has been received and submitted for review.\n"
+            .'Once verified by our committee, it will be published for all students  🎓',
         'no_course_selected' => "⚠️ <b>No course selected </b>\n\n"
-            . "Please tap <b>📤 Submit Material</b> and select a course before sending files.",
-        'cancelled' => "❌ <b>Submission cancelled.</b>",
+            .'Please tap <b>📤 Submit Material</b> and select a course before sending files.',
+        'cancelled' => '❌ <b>Submission cancelled.</b>',
         'cancel' => '❌ Cancel',
         'back_to_edu' => '⬅️ Back to Study Resources',
         'approved_notification' => "🎉 <b>Good news </b>\n\nYour submitted material for <b>:course</b> has been approved by the Education Committee and is now published on the bot \n\nThank you for supporting fellow PoliTo students  🎓",
@@ -161,14 +161,14 @@ return [
         'not_available' => 'This resource is no longer available.',
         'no_files' => 'No downloadable files are available for this resource yet.',
         'caption_header' => "📚 <b>:course</b>\n"
-            . "📄 :title\n\n"
-            . ":description"
-            . '✅ <b>Verified by PARSI</b>',
+            ."📄 :title\n\n"
+            .':description'
+            .'✅ <b>Verified by PARSI</b>',
         'caption_contributor' => "\n⭐ Contributed by: :contributor",
         'caption_drive_link' => "\n\n🔗 <b>Google Drive:</b>\n:link",
         'caption_social_media' => "\n\n✨ Good luck with your exams  🎓\n\n"
-            . "📢 @:channel\n"
-            . "🤖 @:bot",
+            ."📢 @:channel\n"
+            .'🤖 @:bot',
         'send_error' => 'A file could not be sent. Please try again later.',
         'partial_files_error' => 'Some files are not available through Telegram yet.',
         'download_drive' => '📥 Download from Google Drive',
@@ -179,7 +179,7 @@ return [
     ],
     'simple_buttons' => [
         'yes' => 'Yes',
-        'no' => 'No'
+        'no' => 'No',
     ],
     'search' => [
         'prompt' => "🔍 <b>Search Materials & Courses</b>\n\nPlease type the course name, course code, or keyword you are looking for (e.g. <i>Calculus</i>, <i>Physics</i>, <i>Networks</i>):",
@@ -204,16 +204,16 @@ return [
         'write_prompt' => "✍️ <b>Report an Issue to PARSI Team</b>\n\nPlease describe the issue, error, or concern with this material below.\nOur administrators will review your report shortly:",
         'success' => "✅ <b>Thank you </b> Your report has been submitted.\nOur team will review this material shortly.",
         'sent_success' => "✅ <b>Report Message Sent </b>\n\nThank you for reaching out. The PARSI team has received your report message and will review it.",
-        'already_reported' => "ℹ️ You have already reported this material recently. Our team is currently reviewing it.",
+        'already_reported' => 'ℹ️ You have already reported this material recently. Our team is currently reviewing it.',
         'cancel' => '❌ Cancel',
         'cancelled' => 'Report cancelled.',
     ],
     'contact' => [
         'hub_text' => "📞 <b>Contact Us & Student Support</b>\n\n"
-            . "Need assistance, have questions, or want to report an issue with study materials? We are here to help:\n\n"
-            . "• <b>Message Admins:</b> Send your question, suggestion, or feedback via direct message to the PARSI Telegram channel.\n"
-            . "• <b>Report a Material:</b> If a document is corrupted, incorrect, or unreadable, search for it to file a report.\n"
-            . "• <b>Community Channel:</b> Join our official Telegram channel for updates and announcements.",
+            ."Need assistance, have questions, or want to report an issue with study materials? We are here to help:\n\n"
+            ."• <b>Message Admins:</b> Send your question, suggestion, or feedback via direct message to the PARSI Telegram channel.\n"
+            ."• <b>Report a Material:</b> If a document is corrupted, incorrect, or unreadable, search for it to file a report.\n"
+            .'• <b>Community Channel:</b> Join our official Telegram channel for updates and announcements.',
         'report_material_btn' => '🔍 Search Material to Report',
         'too_short' => '⚠️ Please type at least 3 characters.',
         'send_message_btn' => '💬 Send Message to Admins',
@@ -226,25 +226,25 @@ return [
     ],
     'about' => [
         'text' => "<b>PARSI</b> is the Iranian Students Association at <b>Politecnico di Torino</b>, created to support, connect, and assist Iranian students throughout their university experience.\n\n"
-            . "🎯 <b>Our Mission</b>\n"
-            . "We aim to make academic and student life easier by collecting and providing <b>course materials, lecture notes, past exam questions, educational guides</b>, as well as updates on important <b>university, EDISU, and administrative deadlines</b>.\n\n"
-            . "🤝 <b>Built by Students, for Students</b>\n"
-            . "A large part of the resources available through this bot is contributed by students themselves and is reviewed and organized before being shared with the community.\n\n"
-            . "This bot is built through student collaboration, with the goal of making useful knowledge, resources, and experience accessible to everyone.\n\n"
-            . "<b>Welcome to the Iranian student community at Politecnico di Torino.</b>",
+            ."🎯 <b>Our Mission</b>\n"
+            ."We aim to make academic and student life easier by collecting and providing <b>course materials, lecture notes, past exam questions, educational guides</b>, as well as updates on important <b>university, EDISU, and administrative deadlines</b>.\n\n"
+            ."🤝 <b>Built by Students, for Students</b>\n"
+            ."A large part of the resources available through this bot is contributed by students themselves and is reviewed and organized before being shared with the community.\n\n"
+            ."This bot is built through student collaboration, with the goal of making useful knowledge, resources, and experience accessible to everyone.\n\n"
+            .'<b>Welcome to the Iranian student community at Politecnico di Torino.</b>',
         'channel_btn' => '📢 Official Telegram Channel',
         'insta_btn' => '📸 Official Instagram Page',
         'contact_btn' => '💬 Contact PARSI Team',
         'members_btn' => '👥 PARSI Team Members',
         'back_about' => '⬅️ Back to About Us',
         'members_text' => "👥 <b>PARSI Board & Committee Members</b>\n\n"
-            . "• <b>Kave Alikhani</b> — President\n"
-            . "• <b>Arya Gholami</b> — Vice President\n"
-            . "• <b>Anita Javidian</b> — Head of Media Committee\n"
-            . "• <b>Arya Mansouri</b> — Financial Manager\n"
-            . "• <b>Nika Taherian</b> — Head of Cultural Committee\n"
-            . "• <b>Ali Arsalan</b> — Head of Executive Committee\n"
-            . "• <b>Hamidreza Ramezani</b> — Head of Education Committee\n"
+            ."• <b>Kave Alikhani</b> — President\n"
+            ."• <b>Arya Gholami</b> — Vice President\n"
+            ."• <b>Anita Javidian</b> — Head of Media Committee\n"
+            ."• <b>Arya Mansouri</b> — Financial Manager\n"
+            ."• <b>Nika Taherian</b> — Head of Cultural Committee\n"
+            ."• <b>Ali Arsalan</b> — Head of Executive Committee\n"
+            ."• <b>Hamidreza Ramezani</b> — Head of Education Committee\n",
     ],
     'rate_limit' => [
         'too_many_messages' => "⚠️ <b>Too Many Requests</b>\n\nYou are sending messages too quickly. Please wait <b>:seconds seconds</b> before trying again.",

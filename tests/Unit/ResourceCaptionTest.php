@@ -54,4 +54,3 @@ class ResourceCaptionTest extends TestCase
         $this->assertStringContainsString('📥 Custom Section', $caption);
     }
 }
-

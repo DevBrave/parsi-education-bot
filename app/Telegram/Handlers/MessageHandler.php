@@ -3,14 +3,12 @@
 namespace App\Telegram\Handlers;
 
 use App\Models\Course;
-use App\Models\Resource;
-use App\Models\ResourceReport;
 use App\Models\User;
+use App\Services\ResourceSearchService;
 use App\Services\TelegramService;
 use App\Telegram\Keyboards\MainMenuKeyboard;
 use App\Telegram\Keyboards\ProgramMenuKeyboard;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class MessageHandler
 {
@@ -83,12 +81,13 @@ class MessageHandler
             $this->sendAboutUsMenu($chatId, $user);
         } else {
 
-            // TODO : ISSUE #2 - 
+            // TODO : ISSUE #2 -
             $contactCacheKey = "user_contact_state:{$user->id}";
             $contactState = Cache::get($contactCacheKey);
             if ($contactState && ($contactState['step'] ?? null) === 'awaiting_contact_message') {
                 Cache::forget($contactCacheKey);
                 $this->handleContactMessageSubmit($chatId, $user, trim($text));
+
                 return;
             }
 
@@ -97,6 +96,7 @@ class MessageHandler
             if ($contactState && ($contactState['step'] ?? null) === 'awaiting_report_message') {
                 Cache::forget($contactCacheKey);
                 $this->handleReportMessageSubmit($chatId, $user, trim($text));
+
                 return;
             }
 
@@ -105,6 +105,7 @@ class MessageHandler
             if ($searchState && ($searchState['step'] ?? null) === 'awaiting_search_query') {
                 Cache::forget($searchCacheKey);
                 $this->executeSearch($chatId, $user, trim($text));
+
                 return;
             }
 
@@ -118,6 +119,7 @@ class MessageHandler
                     __('bot.submit_material.writing_title', ['title' => $state['title']], $lang),
                     ProgramMenuKeyboard::simpleYesOrNo($lang)
                 );
+
                 return;
             }
 
@@ -133,6 +135,7 @@ class MessageHandler
                         ],
                     ]
                 );
+
                 return;
             }
             $this->executeSearch($chatId, $user, trim($text));
@@ -191,7 +194,7 @@ class MessageHandler
             if ($program && $program->is_active) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
                 $text = __('bot.courses.choose_year', [
-                    'program' => e($program->name) . $levelTag,
+                    'program' => e($program->name).$levelTag,
                 ], $lang);
 
                 $this->telegram->sendMessage(
@@ -261,7 +264,7 @@ class MessageHandler
     public function executeSearch(int $chatId, User $user, string $query, bool $showNavigation = true): void
     {
         $lang = $user->preferred_language ?? 'en';
-        
+
         if (mb_strlen($query) < 2) {
             $replyMarkup = $showNavigation ? ProgramMenuKeyboard::searchPrompt($lang) : null;
             $this->telegram->sendMessage(
@@ -284,7 +287,7 @@ class MessageHandler
             ->get();
 
         // Use the same matching and ordering as inline search.
-        $resources = app(\App\Services\ResourceSearchService::class)
+        $resources = app(ResourceSearchService::class)
             ->query($query)
             ->take(20)
             ->get();
@@ -373,20 +376,21 @@ class MessageHandler
 
         if (mb_strlen($text) < 3) {
             $this->telegram->sendMessage($chatId, __('bot.reports.too_short', [], $lang));
+
             return;
         }
 
         $adminChatId = config('telegram.admin_chat_id');
         if ($adminChatId) {
             $sender = $user->username
-                ? '@' . $user->username
+                ? '@'.$user->username
                 : ($user->first_name ? $user->first_name : "User #{$user->telegram_user_id}");
             $program = $user->program?->name ?? 'Not set';
 
             $adminText = "📬 <b>New Student Report</b>\n\n"
-                . "👤 <b>From:</b> " . e($sender) . " (ID: <code>{$user->telegram_user_id}</code>)\n"
-                . "🎓 <b>Program:</b> " . e($program) . "\n\n"
-                . "💬 <b>Message:</b>\n" . e($text);
+                .'👤 <b>From:</b> '.e($sender)." (ID: <code>{$user->telegram_user_id}</code>)\n"
+                .'🎓 <b>Program:</b> '.e($program)."\n\n"
+                ."💬 <b>Message:</b>\n".e($text);
 
             $this->telegram->sendMessage($adminChatId, $adminText);
         }
@@ -407,20 +411,21 @@ class MessageHandler
 
         if (mb_strlen($text) < 3) {
             $this->telegram->sendMessage($chatId, __('bot.contact.too_short', [], $lang));
+
             return;
         }
 
         $adminChatId = config('telegram.admin_chat_id');
         if ($adminChatId) {
             $sender = $user->username
-                ? '@' . $user->username
+                ? '@'.$user->username
                 : ($user->first_name ? $user->first_name : "User #{$user->telegram_user_id}");
             $program = $user->program?->name ?? 'Not set';
 
             $adminText = "📬 <b>New Student Feedback / Contact</b>\n\n"
-                . "👤 <b>From:</b> " . e($sender) . " (ID: <code>{$user->telegram_user_id}</code>)\n"
-                . "🎓 <b>Program:</b> " . e($program) . "\n\n"
-                . "💬 <b>Message:</b>\n" . e($text);
+                .'👤 <b>From:</b> '.e($sender)." (ID: <code>{$user->telegram_user_id}</code>)\n"
+                .'🎓 <b>Program:</b> '.e($program)."\n\n"
+                ."💬 <b>Message:</b>\n".e($text);
 
             $this->telegram->sendMessage($adminChatId, $adminText);
         }
@@ -445,4 +450,3 @@ class MessageHandler
         );
     }
 }
-

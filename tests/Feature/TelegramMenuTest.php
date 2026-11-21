@@ -3,8 +3,14 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\TelegramWebhookController;
+use App\Models\Course;
+use App\Models\Program;
+use App\Models\Resource;
+use App\Models\ResourceType;
 use App\Models\User;
+use App\Telegram\Keyboards\ProgramMenuKeyboard;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -97,12 +103,12 @@ class TelegramMenuTest extends TestCase
     {
         Http::fake(['*' => Http::response(['ok' => true])]);
 
-        $course = \App\Models\Course::firstOrCreate(
+        $course = Course::firstOrCreate(
             ['course_code' => 'SEARCH_CRS_1'],
             ['name' => 'Quantum Physics 101', 'credits' => 6.0, 'is_active' => true]
         );
 
-        $resourceType = \App\Models\ResourceType::firstOrCreate(
+        $resourceType = ResourceType::firstOrCreate(
             ['code' => 'notes_search'],
             ['display_name' => 'Lecture Notes', 'is_active' => true]
         );
@@ -126,7 +132,7 @@ class TelegramMenuTest extends TestCase
             ['chat' => ['id' => 999333], 'text' => '🔎 Search Resources'], $student,
         ]);
 
-        $this->assertEquals(['step' => 'awaiting_search_query'], \Illuminate\Support\Facades\Cache::get("user_search_state:{$student->id}"));
+        $this->assertEquals(['step' => 'awaiting_search_query'], Cache::get("user_search_state:{$student->id}"));
 
         Http::assertSent(function (Request $request) {
             return str_ends_with($request->url(), '/sendMessage')
@@ -163,7 +169,7 @@ class TelegramMenuTest extends TestCase
     {
         Http::fake(['*' => Http::response(['ok' => true])]);
 
-        $course = \App\Models\Course::firstOrCreate(
+        $course = Course::firstOrCreate(
             ['course_code' => 'ALGO_SRCH'],
             ['name' => 'Distributed Algorithms', 'credits' => 8.0, 'is_active' => true]
         );
@@ -188,44 +194,44 @@ class TelegramMenuTest extends TestCase
 
     public function test_program_menu_keyboard_years_and_caching(): void
     {
-        $program = \App\Models\Program::firstOrCreate(
+        $program = Program::firstOrCreate(
             ['name' => 'Cache Test Program'],
             ['degree_level' => 'bachelor', 'university' => 'PoliTo', 'is_active' => true]
         );
 
-        $course1 = \App\Models\Course::firstOrCreate(
+        $course1 = Course::firstOrCreate(
             ['course_code' => 'TEST_YR1'],
             ['name' => 'Course Year 1', 'credits' => 6.0, 'year' => 1, 'is_active' => true]
         );
-        $course2 = \App\Models\Course::firstOrCreate(
+        $course2 = Course::firstOrCreate(
             ['course_code' => 'TEST_YR2'],
             ['name' => 'Course Year 2', 'credits' => 6.0, 'year' => 2, 'is_active' => true]
         );
 
         $program->courses()->syncWithoutDetaching([$course1->id, $course2->id]);
 
-        \Illuminate\Support\Facades\Cache::forget("catalog:years:program_{$program->id}");
+        Cache::forget("catalog:years:program_{$program->id}");
 
-        $keyboard = \App\Telegram\Keyboards\ProgramMenuKeyboard::years($program, 'fa');
+        $keyboard = ProgramMenuKeyboard::years($program, 'fa');
         $this->assertIsArray($keyboard);
         $this->assertArrayHasKey('inline_keyboard', $keyboard);
 
         // Verify cached value is a primitive array, not an incomplete object
-        $cached = \Illuminate\Support\Facades\Cache::get("catalog:years:program_{$program->id}");
+        $cached = Cache::get("catalog:years:program_{$program->id}");
         $this->assertIsArray($cached);
         $this->assertContains(1, $cached);
         $this->assertContains(2, $cached);
 
         // Call again to verify cache hit execution
-        $cachedKeyboard = \App\Telegram\Keyboards\ProgramMenuKeyboard::years($program, 'fa');
+        $cachedKeyboard = ProgramMenuKeyboard::years($program, 'fa');
         $this->assertEquals($keyboard, $cachedKeyboard);
 
         // Test empty Master degree defaults to [1, 2]
-        $masterProgram = new \App\Models\Program(['degree_level' => 'master']);
+        $masterProgram = new Program(['degree_level' => 'master']);
         $this->assertEquals([1, 2], $masterProgram->defaultYears());
 
         // Test empty Bachelor degree defaults to [1, 2, 3]
-        $bachelorProgram = new \App\Models\Program(['degree_level' => 'bachelor']);
+        $bachelorProgram = new Program(['degree_level' => 'bachelor']);
         $this->assertEquals([1, 2, 3], $bachelorProgram->defaultYears());
     }
 

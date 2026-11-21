@@ -39,7 +39,6 @@ class Resource extends Model
             Cache::forget('admin:dashboard:heavy_metrics');
         };
 
-
         static::saved(function (Resource $resource) {
             if ($resource->wasRecentlyCreated || $resource->wasChanged(['course_id', 'resource_type_id', 'status'])) {
                 Cache::forget("catalog:resource_type_counts:course_{$resource->course_id}");
@@ -114,7 +113,7 @@ class Resource extends Model
     public function buildTelegramCaption(string $lang = 'en', ?string $titleSuffix = null, ?string $middleSection = null): string
     {
         $courseName = $this->course?->name ? e($this->course->name) : 'Course Material';
-        $displayTitle = e($this->title) . ($titleSuffix ? " {$titleSuffix}" : '');
+        $displayTitle = e($this->title).($titleSuffix ? " {$titleSuffix}" : '');
 
         $hasDescription = ! empty(trim($this->description ?? ''));
         $cleanDesc = '';
@@ -122,7 +121,7 @@ class Resource extends Model
 
         if ($hasDescription) {
             $rawDesc = trim($this->description);
-            $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397) . '...' : $rawDesc);
+            $cleanDesc = e(mb_strlen($rawDesc) > 400 ? mb_substr($rawDesc, 0, 397).'...' : $rawDesc);
             $descBlock = "📝 Description: <b>$cleanDesc</b>\n\n\n";
         }
 
@@ -139,11 +138,11 @@ class Resource extends Model
 
         // Fallback: If translation didn't have the :description placeholder at all, append it
         if ($hasDescription && ! str_contains($caption, $cleanDesc)) {
-            $caption .= "\n" . trim($descBlock);
+            $caption .= "\n".trim($descBlock);
         }
 
         if ($middleSection !== null && $middleSection !== '') {
-            $caption .= "\n\n" . trim($middleSection);
+            $caption .= "\n\n".trim($middleSection);
         }
 
         $channel = config('telegram.channel_username', 'PARSI_POLITO');
@@ -173,14 +172,14 @@ class Resource extends Model
             $submitterName = "ID: {$submitter->telegram_user_id}";
         }
 
-        $formattedCaption = '📚 <b>' . e($courseName) . '</b>';
+        $formattedCaption = '📚 <b>'.e($courseName).'</b>';
         if (! empty($cleanTitle)) {
-            $formattedCaption .= "\n📌 <b>" . e($cleanTitle) . '</b>';
+            $formattedCaption .= "\n📌 <b>".e($cleanTitle).'</b>';
         }
-        $formattedCaption .= "\n📄 " . e($resourceFile->original_filename);
-        $formattedCaption .= "\n🏷️ <b>Category:</b> " . e($categoryName);
+        $formattedCaption .= "\n📄 ".e($resourceFile->original_filename);
+        $formattedCaption .= "\n🏷️ <b>Category:</b> ".e($categoryName);
         if (! empty($submitterName)) {
-            $formattedCaption .= "\n👤 <b>Sent by:</b> " . e($submitterName);
+            $formattedCaption .= "\n👤 <b>Sent by:</b> ".e($submitterName);
         }
 
         return $formattedCaption;

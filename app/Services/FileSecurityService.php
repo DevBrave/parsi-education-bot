@@ -44,42 +44,42 @@ class FileSecurityService
      * Known binary signatures ("Magic Bytes") for allowed types.
      */
     protected const MAGIC_BYTES = [
-        'pdf'  => ["%PDF-"],
-        'zip'  => ["PK\x03\x04", "PK\x05\x06", "PK\x07\x08"],
+        'pdf' => ['%PDF-'],
+        'zip' => ["PK\x03\x04", "PK\x05\x06", "PK\x07\x08"],
         'docx' => ["PK\x03\x04"],
         'pptx' => ["PK\x03\x04"],
         'xlsx' => ["PK\x03\x04"],
-        'odt'  => ["PK\x03\x04"],
-        'odp'  => ["PK\x03\x04"],
-        'ods'  => ["PK\x03\x04"],
-        'png'  => ["\x89PNG\r\n\x1a\n"],
-        'jpg'  => ["\xFF\xD8\xFF"],
+        'odt' => ["PK\x03\x04"],
+        'odp' => ["PK\x03\x04"],
+        'ods' => ["PK\x03\x04"],
+        'png' => ["\x89PNG\r\n\x1a\n"],
+        'jpg' => ["\xFF\xD8\xFF"],
         'jpeg' => ["\xFF\xD8\xFF"],
-        'webp' => ["RIFF"],
-        'rar'  => ["Rar!\x1A\x07\x00", "Rar!\x1A\x07\x01\x00"],
-        '7z'   => ["7z\xBC\xAF\x27\x1C"],
-        'gz'   => ["\x1F\x8B"],
+        'webp' => ['RIFF'],
+        'rar' => ["Rar!\x1A\x07\x00", "Rar!\x1A\x07\x01\x00"],
+        '7z' => ["7z\xBC\xAF\x27\x1C"],
+        'gz' => ["\x1F\x8B"],
     ];
 
     /**
      * Signatures of dangerous executable files (Forbidden Signatures).
      */
     protected const MALICIOUS_SIGNATURES = [
-        'MZ'     => 'Windows Executable/DLL (PE binary)',
+        'MZ' => 'Windows Executable/DLL (PE binary)',
         "\x7FELF" => 'Linux Executable (ELF binary)',
         "\xCA\xFE\xBA\xBE" => 'Java/Mach-O Binary',
-        "#!/"    => 'Shell Script Executable',
-        "<?php"  => 'PHP Web Script',
-        "<?="    => 'PHP Short Tag Script',
-        "<script" => 'HTML/JS Executable Payload',
+        '#!/' => 'Shell Script Executable',
+        '<?php' => 'PHP Web Script',
+        '<?=' => 'PHP Short Tag Script',
+        '<script' => 'HTML/JS Executable Payload',
     ];
 
     /**
      * Validate an incoming file submission.
      *
-     * @param string $originalFilename Original name of the uploaded file
-     * @param string|null $mimeType Client-reported MIME type
-     * @param string|null $filePath Local path to the file for deep inspection (if downloaded)
+     * @param  string  $originalFilename  Original name of the uploaded file
+     * @param  string|null  $mimeType  Client-reported MIME type
+     * @param  string|null  $filePath  Local path to the file for deep inspection (if downloaded)
      * @return array [bool 'valid', string|null 'reason', string 'sanitized_filename']
      */
     public function validateUpload(string $originalFilename, ?string $mimeType = null, ?string $filePath = null): array
@@ -236,7 +236,7 @@ class FileSecurityService
         // 3. Fallback for blank names
         $cleaned = trim($cleaned);
         if ($cleaned === '' || $cleaned === '.') {
-            $cleaned = 'document_' . date('Ymd_His') . '.pdf';
+            $cleaned = 'document_'.date('Ymd_His').'.pdf';
         }
 
         return $cleaned;
@@ -254,6 +254,7 @@ class FileSecurityService
 
         if (! function_exists('exec')) {
             $available = false;
+
             return false;
         }
 
@@ -263,6 +264,7 @@ class FileSecurityService
         @exec('clamscan --version 2>&1', $output, $returnVar);
 
         $available = ($returnVar === 0);
+
         return $available;
     }
 

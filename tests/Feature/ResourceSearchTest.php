@@ -37,7 +37,7 @@ class ResourceSearchTest extends TestCase
             'status' => 'pending',
         ]);
 
-        foreach (['OS', 'systems exams', "  OS   exams  "] as $query) {
+        foreach (['OS', 'systems exams', '  OS   exams  '] as $query) {
             $ids = app(ResourceSearchService::class)->query($query)->pluck('id');
             $this->assertTrue($ids->contains($resource->id));
             $this->assertFalse($ids->contains($pending->id));

@@ -28,7 +28,7 @@ return [
 
     'instagram_link' => env('INSTAGRAM_PAGE_LINK', 'https://www.instagram.com/parsi___polito/'),
 
-    'email_address' => env('MAIL_FROM_ADDRESS','parsi.polito@gmail.com'),
+    'email_address' => env('MAIL_FROM_ADDRESS', 'parsi.polito@gmail.com'),
 
     'bot_username' => env('TELEGRAM_BOT_USERNAME', 'parsi_politobot'),
 

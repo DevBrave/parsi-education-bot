@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+use Illuminate\Log\LogManager;
 use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 
@@ -13,7 +15,7 @@ if (! function_exists('bot_log')) {
      *   bot_log('drive')->error('Upload failed', ['file' => $filename]);
      *   bot_log('rbac')->warning('Unauthorized action', ['action' => $action]);
     /**
-     * @return \Psr\Log\LoggerInterface|\Illuminate\Log\LogManager
+     * @return LoggerInterface|LogManager
      */
     function bot_log(string $channel = 'master')
     {
@@ -29,11 +31,11 @@ if (! function_exists('log_rbac')) {
      *   log_rbac("Course #{$course->id} ('{$course->name}') created");
      *   log_rbac("File #{$file->id} ('{$file->original_filename}') deleted from Resource #{$resource->id}");
      */
-    function log_rbac(string $message, ?\App\Models\User $user = null, array $context = []): void
+    function log_rbac(string $message, ?User $user = null, array $context = []): void
     {
         $user = $user ?? (auth()->check() ? auth()->user() : (request()?->user() ?? null));
         $actor = $user
-            ? "user #{$user->id} (" . ($user->username ? '@'.$user->username : ($user->first_name ?: 'ID:'.$user->id)) . ")"
+            ? "user #{$user->id} (".($user->username ? '@'.$user->username : ($user->first_name ?: 'ID:'.$user->id)).')'
             : 'system';
 
         bot_log('rbac')->info("{$message} by {$actor}", array_merge([

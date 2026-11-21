@@ -47,8 +47,6 @@ class UploadResourceFileJob implements ShouldBeUnique, ShouldQueue
         $this->queuedAt = microtime(true);
     }
 
-   
-
     /**
      * Execute the job.
      */
@@ -88,7 +86,7 @@ class UploadResourceFileJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
-     /**
+    /**
      * The unique ID of the job (prevents duplicate dispatch for the same file).
      */
     public function uniqueId(): string

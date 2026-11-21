@@ -40,6 +40,7 @@ class CallbackQueryHandler
 
         if (! $chatId || ! $messageId) {
             $this->telegram->answerCallbackQuery($callbackId);
+
             return;
         }
 
@@ -195,11 +196,11 @@ class CallbackQueryHandler
             }
 
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-            $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
+            $trackTag = ($user->track_id && $user->track) ? ' — 🎯 <i>'.e($user->track->name).'</i>' : '';
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
-                __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag . $trackTag], $lang),
+                __('bot.courses.choose_year', ['program' => e($program->name).$levelTag.$trackTag], $lang),
                 ProgramMenuKeyboard::years($program, $lang, forSubmission: $forSubmission)
             );
         } elseif (str_starts_with($data, 'browse_degree_') || str_starts_with($data, 'submit_degree_')) {
@@ -238,7 +239,7 @@ class CallbackQueryHandler
             $program = Program::where('is_active', true)->find($programId);
             if ($program) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                $text = __('bot.tracks.choose_track', ['program' => e($program->name).$levelTag], $lang);
                 $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::tracks($program, $lang));
             }
         } elseif (str_starts_with($data, 'prog_years_')) {
@@ -246,7 +247,7 @@ class CallbackQueryHandler
             $program = Program::where('is_active', true)->find($programId);
             if ($program) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $text = __('bot.courses.choose_year', ['program' => e($program->name).$levelTag], $lang);
                 $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::years($program, $lang));
             }
         } elseif (str_starts_with($data, 'track_')) {
@@ -266,7 +267,7 @@ class CallbackQueryHandler
             $program = Program::where('is_active', true)->find($programId);
             if ($program) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                $text = __('bot.tracks.choose_track', ['program' => e($program->name).$levelTag], $lang);
                 $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::tracks($program, $lang, backCallback: "submit_degree_{$program->degree_level}", forSubmission: true));
             }
         } elseif (str_starts_with($data, 'submit_prog_years_')) {
@@ -274,7 +275,7 @@ class CallbackQueryHandler
             $program = Program::where('is_active', true)->find($programId);
             if ($program) {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $text = __('bot.courses.choose_year', ['program' => e($program->name).$levelTag], $lang);
                 $this->telegram->editMessageText($chatId, $messageId, $text, ProgramMenuKeyboard::years($program, $lang, forSubmission: true));
             }
         } elseif (str_starts_with($data, 'submit_track_')) {
@@ -287,7 +288,7 @@ class CallbackQueryHandler
             } else {
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
                 if ($program->tracks()->where('is_active', true)->exists()) {
-                    $text = __('bot.tracks.choose_track', ['program' => e($program->name) . $levelTag], $lang);
+                    $text = __('bot.tracks.choose_track', ['program' => e($program->name).$levelTag], $lang);
                     $this->telegram->editMessageText(
                         $chatId,
                         $messageId,
@@ -302,7 +303,7 @@ class CallbackQueryHandler
                     }
 
                     $text .= __('bot.courses.choose_year', [
-                        'program' => e($program->name) . $levelTag,
+                        'program' => e($program->name).$levelTag,
                     ], $lang);
 
                     $this->telegram->editMessageText(
@@ -432,7 +433,7 @@ class CallbackQueryHandler
 
         $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
         $text = __('bot.submit_material.choose_course', [
-            'program' => e($program->name) . $levelTag,
+            'program' => e($program->name).$levelTag,
         ], $lang);
         $trackId = $user->program_id === $program->id
             ? $user->track_id
@@ -512,7 +513,7 @@ class CallbackQueryHandler
 
         if ($program) {
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-            $programTitle = e($program->name) . $levelTag;
+            $programTitle = e($program->name).$levelTag;
 
             $text = '';
             $changedProgram = ($user->program_id !== $program->id);
@@ -539,8 +540,8 @@ class CallbackQueryHandler
                 return;
             }
 
-            $trackTag = ($user->track_id && $user->track) ? " — 🎯 <i>" . e($user->track->name) . "</i>" : '';
-            $text .= __('bot.courses.choose_year', ['program' => $programTitle . $trackTag], $lang);
+            $trackTag = ($user->track_id && $user->track) ? ' — 🎯 <i>'.e($user->track->name).'</i>' : '';
+            $text .= __('bot.courses.choose_year', ['program' => $programTitle.$trackTag], $lang);
 
             $this->telegram->editMessageText(
                 $chatId,
@@ -573,7 +574,7 @@ class CallbackQueryHandler
 
             $user->update(['program_id' => $program->id, 'track_id' => null]);
             $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-            $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+            $text = __('bot.courses.choose_year', ['program' => e($program->name).$levelTag], $lang);
 
             $this->telegram->editMessageText(
                 $chatId,
@@ -598,7 +599,7 @@ class CallbackQueryHandler
 
         $levelTag = $track->program->degree_level ? " ({$track->program->degree_level})" : '';
         $text = __('bot.tracks.saved_track', ['track' => e($track->name)], $lang);
-        $text .= __('bot.courses.choose_year', ['program' => e($track->program->name) . $levelTag], $lang);
+        $text .= __('bot.courses.choose_year', ['program' => e($track->program->name).$levelTag], $lang);
 
         $this->telegram->editMessageText(
             $chatId,
@@ -618,7 +619,7 @@ class CallbackQueryHandler
             if ($program) {
                 $this->rememberSubmissionTrack($user, $messageId, $program, null);
                 $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
-                $text = __('bot.courses.choose_year', ['program' => e($program->name) . $levelTag], $lang);
+                $text = __('bot.courses.choose_year', ['program' => e($program->name).$levelTag], $lang);
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
@@ -637,7 +638,7 @@ class CallbackQueryHandler
             $levelTag = $track->program->degree_level ? " ({$track->program->degree_level})" : '';
             $trackName = e($track->name);
             $text = $user->program_id === $track->program_id ? __('bot.tracks.saved_track', ['track' => $trackName], $lang) : '';
-            $text .= __('bot.courses.choose_year', ['program' => e($track->program->name) . $levelTag . " — {$trackName}"], $lang);
+            $text .= __('bot.courses.choose_year', ['program' => e($track->program->name).$levelTag." — {$trackName}"], $lang);
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
@@ -685,13 +686,13 @@ class CallbackQueryHandler
         $levelTag = $program->degree_level ? " ({$program->degree_level})" : '';
         $yearLabel = $year === 'all'
             ? __('bot.courses.year_all', [], $lang)
-            : (__('bot.courses.year_' . $year, [], $lang) ?: "Year {$year}");
+            : (__('bot.courses.year_'.$year, [], $lang) ?: "Year {$year}");
 
         $trackTag = ($user->track_id && $user->track)
-            ? " — 🎯 <i>" . e($user->track->name) . "</i>"
+            ? ' — 🎯 <i>'.e($user->track->name).'</i>'
             : '';
 
-        $text = "🎓 <b>" . e($program->name) . "{$levelTag}</b>{$trackTag} — <b>{$yearLabel}</b>\n\n" .
+        $text = '🎓 <b>'.e($program->name)."{$levelTag}</b>{$trackTag} — <b>{$yearLabel}</b>\n\n".
             __('bot.courses.choose_course', [], $lang);
 
         $this->telegram->editMessageText(
@@ -776,8 +777,8 @@ class CallbackQueryHandler
         $typeName = $type ? e($type->display_name) : '';
 
         $headerText = $resources->isEmpty()
-            ? "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n" . __('bot.courses.no_materials', [], $lang)
-            : "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n" . __('bot.courses.available_resources', [], $lang);
+            ? "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n".__('bot.courses.no_materials', [], $lang)
+            : "📖 <b>{$courseName}</b> — <b>{$typeName}</b>\n\n".__('bot.courses.available_resources', [], $lang);
 
         $this->telegram->editMessageText(
             $chatId,
@@ -835,8 +836,8 @@ class CallbackQueryHandler
         }
 
         $allFiles = $resource->files;
-        $tgFiles = $allFiles->filter(fn($file) => filled($file->telegram_file_id));
-        $driveFiles = $allFiles->filter(fn($file) => filled($file->drive_file_id));
+        $tgFiles = $allFiles->filter(fn ($file) => filled($file->telegram_file_id));
+        $driveFiles = $allFiles->filter(fn ($file) => filled($file->drive_file_id));
 
         if ($tgFiles->isEmpty() && $driveFiles->isEmpty()) {
             $this->telegram->sendMessage($chatId, __('bot.resources.no_files', [], $lang));
@@ -970,7 +971,7 @@ class CallbackQueryHandler
             ],
         ];
 
-        $text = ($caption ? $caption . "\n\n" : '') . __('bot.resources.available_on_drive', [], $lang);
+        $text = ($caption ? $caption."\n\n" : '').__('bot.resources.available_on_drive', [], $lang);
 
         $this->telegram->sendMessage($chatId, $text, ['inline_keyboard' => $buttons]);
     }
@@ -985,6 +986,7 @@ class CallbackQueryHandler
 
         if (! $resource) {
             $this->telegram->sendMessage($chatId, __('bot.resources.not_available', [], $lang));
+
             return;
         }
 
@@ -1008,6 +1010,7 @@ class CallbackQueryHandler
 
         if (! $resource) {
             $this->telegram->editMessageText($chatId, $messageId, __('bot.resources.not_available', [], $lang), ['inline_keyboard' => []]);
+
             return;
         }
 
@@ -1016,7 +1019,7 @@ class CallbackQueryHandler
 
         // Prevent duplicate pending reports from the same user for the same resource & file
         $existing = ResourceReport::where('resource_id', $resourceId)
-            ->when($validFileId, fn($q) => $q->where('resource_file_id', $validFileId))
+            ->when($validFileId, fn ($q) => $q->where('resource_file_id', $validFileId))
             ->where('user_id', $user->id)
             ->where('status', ResourceReport::STATUS_PENDING)
             ->first();
@@ -1028,6 +1031,7 @@ class CallbackQueryHandler
                 __('bot.reports.already_reported', [], $lang),
                 ['inline_keyboard' => []]
             );
+
             return;
         }
 
@@ -1100,7 +1104,7 @@ class CallbackQueryHandler
             $cleanContent = $originalContent;
         }
 
-        $newContent = $cleanContent . "\n\n✅ <b>APPROVED & PUBLISHED</b> by {$reviewerTag}\n📅 " . now()->format('Y-m-d H:i');
+        $newContent = $cleanContent."\n\n✅ <b>APPROVED & PUBLISHED</b> by {$reviewerTag}\n📅 ".now()->format('Y-m-d H:i');
 
         // Update buttons: remove Approve/Reject buttons
         $updatedKeyboard = ['inline_keyboard' => []];
@@ -1173,7 +1177,7 @@ class CallbackQueryHandler
             $cleanContent = $originalContent;
         }
 
-        $newContent = $cleanContent . "\n\n❌ <b>REJECTED</b> by {$reviewerTag}\n📅 " . now()->format('Y-m-d H:i');
+        $newContent = $cleanContent."\n\n❌ <b>REJECTED</b> by {$reviewerTag}\n📅 ".now()->format('Y-m-d H:i');
 
         if ($hasCaption) {
             $this->telegram->editMessageCaption($chatId, $messageId, $newContent, ['inline_keyboard' => []], 'HTML');

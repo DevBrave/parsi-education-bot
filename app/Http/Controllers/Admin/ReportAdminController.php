@@ -8,7 +8,6 @@ use App\Services\GoogleDriveService;
 use App\Services\TelegramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -31,8 +30,8 @@ class ReportAdminController extends Controller
             'user',
             'resolver',
         ])
-        ->forUser($user)
-        ->latest();
+            ->forUser($user)
+            ->latest();
 
         // 1. Status Filter
         if ($request->filled('status')) {
@@ -197,7 +196,7 @@ class ReportAdminController extends Controller
                 try {
                     $telegram->deleteMessage($storageChannelId, $file->telegram_message_id);
                 } catch (\Throwable $e) {
-                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: " . $e->getMessage());
+                    bot_log('telegram')->warning("Failed to delete message #{$file->telegram_message_id} from Telegram channel: ".$e->getMessage());
                 }
             }
             $file->delete();
@@ -216,7 +215,7 @@ class ReportAdminController extends Controller
                 'status' => ResourceReport::STATUS_RESOLVED,
                 'resolved_by' => $user->id,
                 'resolved_at' => now(),
-                'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Reported file was already deleted.",
+                'admin_notes' => ($report->admin_notes ? $report->admin_notes.' | ' : '').'Reported file was already deleted.',
             ]);
 
             return redirect()
@@ -247,7 +246,7 @@ class ReportAdminController extends Controller
             'status' => ResourceReport::STATUS_RESOLVED,
             'resolved_by' => $user->id,
             'resolved_at' => now(),
-            'admin_notes' => ($report->admin_notes ? $report->admin_notes . " | " : "") . "Faulty file '{$fileName}' deleted by {$user->first_name}",
+            'admin_notes' => ($report->admin_notes ? $report->admin_notes.' | ' : '')."Faulty file '{$fileName}' deleted by {$user->first_name}",
         ]);
 
         return redirect()

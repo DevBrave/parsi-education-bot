@@ -54,6 +54,7 @@ class OnboardingHandler
 
             return true;
         }
+
         return false;
     }
 
@@ -133,7 +134,6 @@ class OnboardingHandler
         $user->update(['preferred_language' => $lang]);
 
         $this->finishOnboarding($chatId, $messageId, $user);
-
 
         return true;
     }

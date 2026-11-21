@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -41,7 +42,7 @@ return new class extends Migration
             $table->index(['course_id', 'resource_type_id', 'academic_year_id', 'status'], 'idx_resources_browse');
             $table->index('exam_date', 'idx_resources_exam_date');
 
-            if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+            if (DB::getDriverName() !== 'sqlite') {
                 $table->fullText(
                     ['title', 'description'],
                     'ft_resources_text'

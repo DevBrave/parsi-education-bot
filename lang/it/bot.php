@@ -3,41 +3,41 @@
 return [
     'onboarding' => [
         'language_prompt' => "🌐 <b>Welcome to PARSI PoliTo Bot</b>\n\n"
-            . "Please select your preferred language:\n"
-            . "Seleziona la tua lingua preferita:\n"
-            . 'لطفاً زبان مورد نظر خود را انتخاب کنید:',
+            ."Please select your preferred language:\n"
+            ."Seleziona la tua lingua preferita:\n"
+            .'لطفاً زبان مورد نظر خود را انتخاب کنید:',
         'program_prompt' => "🎓 <b>Seleziona il tuo Corso di Laurea</b>\n\n"
-            . 'Scegli il tuo percorso di studi al Politecnico di Torino per personalizzare i materiali didattici:',
+            .'Scegli il tuo percorso di studi al Politecnico di Torino per personalizzare i materiali didattici:',
         'degree_prompt' => "🎓 <b>Seleziona Livello di Laurea</b>\n\n"
-            . 'Scegli il tuo livello di studio:',
+            .'Scegli il tuo livello di studio:',
         'programs_by_degree_prompt' => "📚 <b>Seleziona Corso di Laurea (:degree)</b>\n\n"
-            . 'Scegli il tuo corso di laurea:',
+            .'Scegli il tuo corso di laurea:',
         'back_degrees' => '⬅️ Torna ai Livelli di Laurea',
         'completed' => "🎉 <b>Configurazione completata, :name</b>\n\n"
-            . 'Puoi cambiare la lingua nelle impostazioni.',
+            .'Puoi cambiare la lingua nelle impostazioni.',
         'ready' => 'Cosa vorresti fare?',
     ],
     'menu' => [
         'welcome' => "👋 <b>Benvenuto su PARSI Education Bot, :name</b>\n\n"
-            . "L'Associazione Studentesca PARSI è qui per supportarti con materiali didattici, servizi per gli studenti e guide universitarie.\n\n"
-            . 'Quale servizio vorresti utilizzare oggi?',
+            ."L'Associazione Studentesca PARSI è qui per supportarti con materiali didattici, servizi per gli studenti e guide universitarie.\n\n"
+            .'Quale servizio vorresti utilizzare oggi?',
         'choose_option' => "Scegli un'opzione dal menu sottostante, o invia /start.",
         'closed' => "<b>:lastSection</b>\n\nMenu chiuso.",
         'default_section' => 'Menu',
     ],
     'settings' => [
         'title' => "⚙️ <b>Impostazioni</b>\n\n"
-            . "Lingua attuale: <b>:lang</b>\n"
-            . "Corso di Laurea: <b>:program</b>\n\n"
-            . 'Cosa desideri modificare?',
+            ."Lingua attuale: <b>:lang</b>\n"
+            ."Corso di Laurea: <b>:program</b>\n\n"
+            .'Cosa desideri modificare?',
         'not_selected' => 'Non selezionato',
         'change_language' => '🌐 Cambia Lingua',
         'change_program' => '🎓 Cambia Corso di Laurea',
         'back_settings' => '⬅️ Torna alle Impostazioni',
         'change_language_prompt' => "🌐 <b>Select Preferred Language</b>\n\n"
-            . "Please select your preferred language:\n"
-            . "Seleziona la tua lingua preferita:\n"
-            . 'لطفاً زبان مورد نظر خود را انتخاب کنید:',
+            ."Please select your preferred language:\n"
+            ."Seleziona la tua lingua preferita:\n"
+            .'لطفاً زبان مورد نظر خود را انتخاب کنید:',
         'change_program_prompt' => "🔄 <b>Seleziona Corso di Laurea</b>\n\nScegli un corso di laurea:",
     ],
     'sections' => [
@@ -57,16 +57,16 @@ return [
     ],
     'report' => [
         'hub_text' => "⚠️ <b>Centro Segnalazioni e Supporto</b>\n\n"
-            . "Segnala un problema con un materiale didattico oppure invia un messaggio direttamente agli amministratori PARSI:\n\n"
-            . "• Per segnalare un file danneggiato o errato, cercalo e premi <b>Segnala</b>.\n"
-            . "• Per inviare una segnalazione scritta al team, premi <b>Invia Segnalazione agli Admin</b>.",
+            ."Segnala un problema con un materiale didattico oppure invia un messaggio direttamente agli amministratori PARSI:\n\n"
+            ."• Per segnalare un file danneggiato o errato, cercalo e premi <b>Segnala</b>.\n"
+            .'• Per inviare una segnalazione scritta al team, premi <b>Invia Segnalazione agli Admin</b>.',
         'report_material_btn' => '🔍 Cerca Materiale da Segnalare',
         'send_report_btn' => '📝 Invia Segnalazione agli Admin',
     ],
     'tutorials' => [
         'title' => "📑 <b>Guide e Tutorial Didattici PARSI</b>\n\n"
-            . "Consulta le guide e i tutorial pratici preparati dall'associazione PARSI per gli studenti del Politecnico di Torino.\n\n"
-            . "Seleziona una guida per aprire il relativo post o documento:",
+            ."Consulta le guide e i tutorial pratici preparati dall'associazione PARSI per gli studenti del Politecnico di Torino.\n\n"
+            .'Seleziona una guida per aprire il relativo post o documento:',
         'edisu_btn' => '🏛️ Guida Borsa di Studio e Alloggi EDISU',
         'enrollment_btn' => '🎓 Guida Immatricolazione e Visto',
         'didattica_btn' => '💻 Tutorial Portale della Didattica',
@@ -75,35 +75,35 @@ return [
     ],
     'education_hub' => [
         'title' => "📚 <b>Materiali Didattici</b>\n\n"
-            . "Benvenuto nell'archivio didattico di PARSI per il Politecnico di Torino.\n\n"
-            . "Qui puoi consultare gli appunti e materiali dei corsi, cercare tra tutte le materie, o inviare esami e dispense per aiutare altri studenti\n\n"
-            . "Cosa vorresti fare?",
+            ."Benvenuto nell'archivio didattico di PARSI per il Politecnico di Torino.\n\n"
+            ."Qui puoi consultare gli appunti e materiali dei corsi, cercare tra tutte le materie, o inviare esami e dispense per aiutare altri studenti\n\n"
+            .'Cosa vorresti fare?',
         'browse_btn' => '📚 Visualizza Corsi e Materiali',
         'search_btn' => '🔍 Cerca Materiali',
         'submit_btn' => '📤 Invia Materiale Didattico',
     ],
     'submit_material' => [
         'prompt' => "📤 <b>Contribuisci con Materiale Didattico</b>\n\n"
-            . "Aiuta gli studenti del PoliTo condividendo temi d'esame, appunti o riassunti\n\n"
-            . "Per inviare:\n"
-            . "1. Premi <b>📚 Materiali Didattici</b>\n"
-            . "2. Scegli Corso di Laurea e Insegnamento\n"
-            . "3. Premi <b>📤 Invia Materiale per questo Corso</b>\n\n"
-            . 'Gli amministratori del Comitato Didattico verificheranno e pubblicheranno il materiale 🎓',
+            ."Aiuta gli studenti del PoliTo condividendo temi d'esame, appunti o riassunti\n\n"
+            ."Per inviare:\n"
+            ."1. Premi <b>📚 Materiali Didattici</b>\n"
+            ."2. Scegli Corso di Laurea e Insegnamento\n"
+            ."3. Premi <b>📤 Invia Materiale per questo Corso</b>\n\n"
+            .'Gli amministratori del Comitato Didattico verificheranno e pubblicheranno il materiale 🎓',
         'choose_course' => "📤 <b>Invia Materiale</b> — 🎓 <b>:program</b>\n\nScegli l'insegnamento per cui desideri caricare il materiale:",
         'choose_type' => "📤 <b>Invia Materiale</b> — 📚 <b>:course</b>\n\nScegli il tipo di materiale didattico che desideri inviare:",
         'course_prompt' => "📤 <b>Invia Materiale per :course</b>\n\n"
-            . "Grazie per il tuo contributo a PARSI PoliTo\n\n"
-            . "📝 Invia prima un titolo per questo materiale, poi potrai caricare il/i file.\n\n"
-            . 'Gli amministratori del Comitato Didattico verificheranno e pubblicheranno il file 🎓',
+            ."Grazie per il tuo contributo a PARSI PoliTo\n\n"
+            ."📝 Invia prima un titolo per questo materiale, poi potrai caricare il/i file.\n\n"
+            .'Gli amministratori del Comitato Didattico verificheranno e pubblicheranno il file 🎓',
         'file_received' => "📥 File ricevuto: <b>:filename</b>\n📁 File totali: <b>:count</b>\n\n💡 Puoi inviare altri file per questo materiale, oppure tocca <b>Conferma invio</b> per terminare.",
         'finish_button' => '✅ Conferma invio (:count)',
         'success' => "✅ <b>Grazie</b>\n\n"
-            . "Il tuo materiale per <b>:course</b> (:count file) è stato ricevuto ed è in fase di revisione.\n"
-            . 'Una volta approvato dal comitato, sarà visibile a tutti gli studenti 🎓',
+            ."Il tuo materiale per <b>:course</b> (:count file) è stato ricevuto ed è in fase di revisione.\n"
+            .'Una volta approvato dal comitato, sarà visibile a tutti gli studenti 🎓',
         'no_course_selected' => "⚠️ <b>Nessun insegnamento selezionato</b>\n\n"
-            . "Premi <b>📤 Invia Materiale</b> e seleziona un insegnamento prima di inviare i file.",
-        'cancelled' => "❌ <b>Invio annullato.</b>",
+            .'Premi <b>📤 Invia Materiale</b> e seleziona un insegnamento prima di inviare i file.',
+        'cancelled' => '❌ <b>Invio annullato.</b>',
         'cancel' => '❌ Annulla',
         'back_to_edu' => '⬅️ Torna ai Materiali Didattici',
         'approved_notification' => "🎉 <b>Buone notizie</b>\n\nIl tuo materiale per <b>:course</b> è stato approvato dal Comitato Didattico ed è ora disponibile sul bot\n\nGrazie per il tuo contributo alla comunità studentesca PARSI 🎓",
@@ -156,14 +156,14 @@ return [
         'not_available' => 'Questo materiale non è più disponibile.',
         'no_files' => 'Nessun file scaricabile al momento disponibile per questa risorsa.',
         'caption_header' => "📚 <b>:course</b>\n"
-            . "📄 :title\n\n"
-            . ":description"
-            . '✅ <b>Verificato da PARSI</b>',
+            ."📄 :title\n\n"
+            .':description'
+            .'✅ <b>Verificato da PARSI</b>',
         'caption_contributor' => "\n⭐ Contributo di: :contributor",
         'caption_drive_link' => "\n\n🔗 <b>Google Drive:</b>\n:link",
         'caption_social_media' => "\n\n✨ In bocca al lupo per gli esami 🎓\n\n"
-            . "📢 @:channel\n"
-            . "🤖 @:bot",
+            ."📢 @:channel\n"
+            .'🤖 @:bot',
         'send_error' => 'Impossibile inviare il file. Riprova più tardi.',
         'partial_files_error' => 'Alcuni file non sono ancora disponibili su Telegram.',
         'download_drive' => '📥 Scarica da Google Drive',
@@ -198,16 +198,16 @@ return [
         'too_short' => '⚠️ Inserisci almeno 3 caratteri.',
         'write_prompt' => "✍️ <b>Invia una Segnalazione al Team PARSI</b>\n\nDescrivi il problema, errore o anomalia riscontrata con questo materiale.\nI nostri amministratori verificheranno la segnalazione a breve:",
         'success' => "✅ <b>Grazie</b> La tua segnalazione è stata inviata.\nIl nostro team la verificherà a breve.",
-        'already_reported' => "ℹ️ Hai già segnalato questo materiale di recente. Lo stiamo verificando.",
+        'already_reported' => 'ℹ️ Hai già segnalato questo materiale di recente. Lo stiamo verificando.',
         'cancel' => '❌ Annulla',
         'cancelled' => 'Segnalazione annullata.',
     ],
     'contact' => [
         'hub_text' => "📞 <b>Contattaci e Supporto Studenti</b>\n\n"
-            . "Hai bisogno di aiuto, hai domande o vuoi segnalare un problema con i materiali didattici? Siamo a tua disposizione:\n\n"
-            . "• <b>Scrivi ai Moderatori:</b> Invia le tue domande, suggerimenti o feedback tramite messaggio diretto al canale Telegram di PARSI.\n"
-            . "• <b>Segnala un Materiale:</b> Se un file è danneggiato, errato o illeggibile, cercalo per inviare una segnalazione.\n"
-            . "• <b>Canale Community:</b> Unisciti al nostro canale Telegram ufficiale per tutti gli aggiornamenti.",
+            ."Hai bisogno di aiuto, hai domande o vuoi segnalare un problema con i materiali didattici? Siamo a tua disposizione:\n\n"
+            ."• <b>Scrivi ai Moderatori:</b> Invia le tue domande, suggerimenti o feedback tramite messaggio diretto al canale Telegram di PARSI.\n"
+            ."• <b>Segnala un Materiale:</b> Se un file è danneggiato, errato o illeggibile, cercalo per inviare una segnalazione.\n"
+            .'• <b>Canale Community:</b> Unisciti al nostro canale Telegram ufficiale per tutti gli aggiornamenti.',
         'too_short' => '⚠️ Inserisci almeno 3 caratteri.',
         'report_material_btn' => '🔍 Cerca Materiale da Segnalare',
         'send_message_btn' => '💬 Invia Messaggio ai Moderatori',
@@ -220,25 +220,25 @@ return [
     ],
     'about' => [
         'text' => "<b>PARSI</b> è l’associazione degli studenti iraniani del <b>Politecnico di Torino</b>, nata con l’obiettivo di supportare, mettere in contatto e accompagnare gli studenti iraniani durante il loro percorso universitario.\n\n"
-            . "🎯 <b>La nostra missione</b>\n"
-            . "Cerchiamo di rendere più semplice la vita accademica e studentesca raccogliendo e condividendo <b>materiale didattico, appunti, prove d’esame, guide utili</b> e informazioni sulle principali <b>scadenze universitarie, EDISU e amministrative</b>.\n\n"
-            . "🤝 <b>Creato dagli studenti, per gli studenti</b>\n"
-            . "Gran parte dei materiali disponibili nel bot viene condivisa direttamente dagli studenti e, dopo essere stata revisionata e organizzata, viene messa a disposizione della comunità.\n\n"
-            . "Questo bot nasce dalla collaborazione tra studenti, con l’obiettivo di rendere accessibili a tutti risorse, informazioni ed esperienze utili.\n\n"
-            . "<b>Benvenuti nella comunità degli studenti iraniani del Politecnico di Torino.</b>",
+            ."🎯 <b>La nostra missione</b>\n"
+            ."Cerchiamo di rendere più semplice la vita accademica e studentesca raccogliendo e condividendo <b>materiale didattico, appunti, prove d’esame, guide utili</b> e informazioni sulle principali <b>scadenze universitarie, EDISU e amministrative</b>.\n\n"
+            ."🤝 <b>Creato dagli studenti, per gli studenti</b>\n"
+            ."Gran parte dei materiali disponibili nel bot viene condivisa direttamente dagli studenti e, dopo essere stata revisionata e organizzata, viene messa a disposizione della comunità.\n\n"
+            ."Questo bot nasce dalla collaborazione tra studenti, con l’obiettivo di rendere accessibili a tutti risorse, informazioni ed esperienze utili.\n\n"
+            .'<b>Benvenuti nella comunità degli studenti iraniani del Politecnico di Torino.</b>',
         'channel_btn' => '📢 Canale Telegram Ufficiale',
         'insta_btn' => '📸 Pagina Instagram Ufficiale',
         'contact_btn' => '💬 Contatta il Team PARSI',
         'members_btn' => '👥 Membri del Team PARSI',
         'back_about' => '⬅️ Torna a Chi siamo',
         'members_text' => "👥 <b>Membri del Direttivo PARSI</b>\n\n"
-            . "• <b>Kave Alikhani</b> — Presidente\n"
-            . "• <b>Arya Gholami</b> — Vicepresidente\n"
-            . "• <b>Anita Javidian</b> — Responsabile Comitato Media\n"
-            . "• <b>Arya Mansouri</b> — Responsabile Finanziario\n"
-            . "• <b>Nika Taherian</b> — Responsabile Comitato Culturale\n"
-            . "• <b>Ali Arsalan</b> — Responsabile Comitato Esecutivo\n"
-            . "• <b>Hamidreza Ramezani</b> — Responsabile Comitato Didattico\n",
+            ."• <b>Kave Alikhani</b> — Presidente\n"
+            ."• <b>Arya Gholami</b> — Vicepresidente\n"
+            ."• <b>Anita Javidian</b> — Responsabile Comitato Media\n"
+            ."• <b>Arya Mansouri</b> — Responsabile Finanziario\n"
+            ."• <b>Nika Taherian</b> — Responsabile Comitato Culturale\n"
+            ."• <b>Ali Arsalan</b> — Responsabile Comitato Esecutivo\n"
+            ."• <b>Hamidreza Ramezani</b> — Responsabile Comitato Didattico\n",
     ],
     'rate_limit' => [
         'too_many_messages' => "⚠️ <b>Troppe Richieste</b>\n\nStai inviando messaggi troppo velocemente. Attendi <b>:seconds secondi</b> prima di riprovare.",
@@ -261,4 +261,3 @@ return [
         ],
     ],
 ];
-

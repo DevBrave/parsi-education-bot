@@ -6,10 +6,10 @@ use App\Jobs\ProcessTelegramUpdate;
 use App\Models\User;
 use App\Telegram\Handlers\CallbackQueryHandler;
 use App\Telegram\Handlers\MessageHandler;
+use App\Telegram\TelegramUpdateDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class TelegramWebhookController extends Controller
 {
@@ -38,7 +38,8 @@ class TelegramWebhookController extends Controller
         // Execute synchronously so Telegram receives answerInlineQuery immediately without queue delay.
         // Instead of passing it to the background queue
         if (isset($payload['inline_query'])) {
-            app(\App\Telegram\TelegramUpdateDispatcher::class)->dispatch($payload);
+            app(TelegramUpdateDispatcher::class)->dispatch($payload);
+
             return response()->noContent();
         }
 

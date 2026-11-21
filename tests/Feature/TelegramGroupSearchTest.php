@@ -11,6 +11,8 @@ use App\Telegram\TelegramUpdateDispatcher;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 use Tests\TestCase;
 
 class TelegramGroupSearchTest extends TestCase
@@ -129,12 +131,12 @@ class TelegramGroupSearchTest extends TestCase
 
     public function test_chosen_inline_result_increments_downloads_and_inline_shares_count(): void
     {
-        $channelMock = \Mockery::mock(\Psr\Log\LoggerInterface::class);
+        $channelMock = \Mockery::mock(LoggerInterface::class);
         $channelMock->shouldReceive('info')
             ->once()
             ->with(\Mockery::pattern('/Resource #\d+ selected via inline query/'), \Mockery::type('array'));
 
-        \Illuminate\Support\Facades\Log::shouldReceive('channel')
+        Log::shouldReceive('channel')
             ->with('telegram')
             ->andReturn($channelMock);
 
