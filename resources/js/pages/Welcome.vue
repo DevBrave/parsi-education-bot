@@ -78,6 +78,7 @@ const features = [
                         <ArrowUpRight :size="15"
                     /></a>
                     <a v-else href="/" class="button button-dark">My account</a>
+
                 </nav>
             </div>
         </header>

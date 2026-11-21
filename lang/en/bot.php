@@ -2,7 +2,7 @@
 
 return [
     'onboarding' => [
-        'language_prompt' => "🌐 <b>Welcome to PARSI PoliTo Bot!</b>\n\n"
+        'language_prompt' => "🌐 <b>Welcome to PARSI PoliTo Bot </b>\n\n"
             . "Please select your preferred language:\n"
             . "Seleziona la tua lingua preferita:\n"
             . 'لطفاً زبان مورد نظر خود را انتخاب کنید:',
@@ -13,12 +13,12 @@ return [
         'programs_by_degree_prompt' => "📚 <b>Select Programme (:degree)</b>\n\n"
             . "Please choose your study programme:",
         'back_degrees' => '⬅️ Back to Degree Levels',
-        'completed' => "🎉 <b>Setup complete, :name!</b>\n\n"
-            . 'Your programme is set to <b>:program</b>.',
+        'completed' => "🎉 <b>Setup complete, :name </b>\n\n"
+            . 'You can change your language in Settings.',
         'ready' => 'What would you like to do?',
     ],
     'menu' => [
-        'welcome' => "👋 <b>Welcome  to PARSI Education Bot, :name!</b>\n\n"
+        'welcome' => "👋 <b>Welcome  to PARSI Education Bot, :name </b>\n\n"
             . "PARSI Student Association is here to support you with educational materials, student services, and university guides.\n\n"
             . 'What service would you like to use today?',
         'choose_option' => "Please choose an option from the menu below, or send /start.",
@@ -49,11 +49,11 @@ return [
         'report' => '⚠️ Report',
         'tutorials' => '📑 Tutorials & Guides',
         'groups' => '👥 Student Groups',
-        'edisu_coming_soon' => "🔍 <b>Edisu</b>\n\nThe Edisu guide section will be available soon! 🚀",
-        'deadlines_coming_soon' => "❓ <b>Important Deadlines</b>\n\nAcademic deadlines will be available soon! 🚀",
-        'tutorials_coming_soon' => "📑 <b>Tutorials & Guides</b>\n\nPARSI tutorials and educational guides will be available soon! 🚀",
-        'groups_coming_soon' => "👥 <b>Student Groups</b>\n\nMajor and course-specific student groups will be available here soon! 🚀",
-        'contact_coming_soon' => "⚠️ <b>Contact / Report</b>\n\nThis section will be available soon! 🚀",
+        'edisu_coming_soon' => "🔍 <b>Edisu</b>\n\nThe Edisu guide section will be available soon  🚀",
+        'deadlines_coming_soon' => "❓ <b>Important Deadlines</b>\n\nAcademic deadlines will be available soon  🚀",
+        'tutorials_coming_soon' => "📑 <b>Tutorials & Guides</b>\n\nPARSI tutorials and educational guides will be available soon  🚀",
+        'groups_coming_soon' => "👥 <b>Student Groups</b>\n\nMajor and course-specific student groups will be available here soon  🚀",
+        'contact_coming_soon' => "⚠️ <b>Contact / Report</b>\n\nThis section will be available soon  🚀",
     ],
     'report' => [
         'title' => "⚠️ <b>Report & Support Center</b>\n\n"
@@ -81,7 +81,7 @@ return [
     'education_hub' => [
         'title' => "📚 <b>Study Resources</b>\n\n"
             . "Welcome to the PARSI academic repository for Politecnico di Torino.\n\n"
-            . "Here you can explore verified course materials, search across all subjects, or contribute past exams and notes for fellow students!\n\n"
+            . "Here you can explore verified course materials, search across all subjects, or contribute past exams and notes for fellow students \n\n"
             . "What would you like to do?",
         'browse_btn' => '📚 View Courses & Materials',
         'search_btn' => '🔍 Search Materials',
@@ -89,34 +89,34 @@ return [
     ],
     'submit_material' => [
         'prompt' => "📤 <b>Contribute Study Material</b>\n\n"
-            . "Help fellow PoliTo students by submitting past exams, lecture notes, summaries, or exercises!\n\n"
+            . "Help fellow PoliTo students by submitting past exams, lecture notes, summaries, or exercises \n\n"
             . "To submit:\n"
             . "1. Tap <b>📚 Study Resources</b>\n"
             . "2. Choose your Degree & Course\n"
             . "3. Tap <b>📤 Submit Material for this Course</b>\n\n"
-            . 'The Education Committee admins will review, verify, and publish your material! 🎓',
+            . 'The Education Committee admins will review, verify, and publish your material  🎓',
         'choose_course' => "📤 <b>Submit Material</b> — 🎓 <b>:program</b>\n\nSelect the course you want to submit material for:",
         'choose_type' => "📤 <b>Submit Material</b> — 📚 <b>:course</b>\n\nChoose the type of material you want to submit:",
         'course_prompt' => "📤 <b>Submit Material for :course</b>\n\n"
-            . "Thank you for contributing to PARSI PoliTo!\n\n"
+            . "Thank you for contributing to PARSI PoliTo \n\n"
             . "📝 Please send a title for this material first, then you can upload your file(s).\n\n"
-            . 'The Education Committee admins will review and publish your submission! 🎓',
+            . 'The Education Committee admins will review and publish your submission  🎓',
         'file_received' => "📥 Received: <b>:filename</b>\n📁 Total files: <b>:count</b>\n\n💡 You can send more files for this material, or tap <b>Done Uploading</b> below when finished.",
         'finish_button' => '✅ Done Uploading (:count)',
-        'success' => "✅ <b>Thank you!</b>\n\n"
+        'success' => "✅ <b>Thank you </b>\n\n"
             . "Your material for <b>:course</b> (:count file(s)) has been received and submitted for review.\n"
-            . 'Once verified by our committee, it will be published for all students! 🎓',
-        'no_course_selected' => "⚠️ <b>No course selected!</b>\n\n"
+            . 'Once verified by our committee, it will be published for all students  🎓',
+        'no_course_selected' => "⚠️ <b>No course selected </b>\n\n"
             . "Please tap <b>📤 Submit Material</b> and select a course before sending files.",
         'cancelled' => "❌ <b>Submission cancelled.</b>",
         'cancel' => '❌ Cancel',
         'back_to_edu' => '⬅️ Back to Study Resources',
-        'approved_notification' => "🎉 <b>Good news!</b>\n\nYour submitted material for <b>:course</b> has been approved by the Education Committee and is now published on the bot!\n\nThank you for supporting fellow PoliTo students! 🎓",
-        'rejected_notification' => "❌ <b>Submission Update</b>\n\nYour submitted file for <b>:course</b> was reviewed by the Education Committee and could not be approved for publication at this time.\n\nThank you for your effort and support! 🤝",
+        'approved_notification' => "🎉 <b>Good news </b>\n\nYour submitted material for <b>:course</b> has been approved by the Education Committee and is now published on the bot \n\nThank you for supporting fellow PoliTo students  🎓",
+        'rejected_notification' => "❌ <b>Submission Update</b>\n\nYour submitted file for <b>:course</b> was reviewed by the Education Committee and could not be approved for publication at this time.\n\nThank you for your effort and support  🤝",
         'writing_title' => "This is your title: <b>:title</b>\n\nIf you want to continue, tap <b>Yes</b> and send your file(s).",
-        'choose_title' => "⚠️ <b>Please choose a title first!</b>\n\nBefore uploading your file(s), please type a descriptive title (e.g. <i>2024 Exams with solutions</i>) into this chat and confirm it.",
-        'title_approved' => "✅ <b>Title confirmed!</b>\n\nYou can now send your file(s) directly into this chat (single file or album).",
-        'title_rejected' => "✏️ <b>No problem!</b>\n\nPlease type the new title you would like to use:",
+        'choose_title' => "⚠️ <b>Please choose a title first </b>\n\nBefore uploading your file(s), please type a descriptive title (e.g. <i>2024 Exams with solutions</i>) into this chat and confirm it.",
+        'title_approved' => "✅ <b>Title confirmed </b>\n\nYou can now send your file(s) directly into this chat (single file or album).",
+        'title_rejected' => "✏️ <b>No problem </b>\n\nPlease type the new title you would like to use:",
         'waiting_for_files' => "📎 <b>Waiting for files...</b>\n\nTitle: <b>:title</b>\n\nPlease send your file(s) (PDF, ZIP, DOCX, or photo) into this chat.",
     ],
     'courses' => [
@@ -166,7 +166,7 @@ return [
             . '✅ <b>Verified by PARSI</b>',
         'caption_contributor' => "\n⭐ Contributed by: :contributor",
         'caption_drive_link' => "\n\n🔗 <b>Google Drive:</b>\n:link",
-        'caption_social_media' => "\n\n✨ Good luck with your exams! 🎓\n\n"
+        'caption_social_media' => "\n\n✨ Good luck with your exams  🎓\n\n"
             . "📢 @:channel\n"
             . "🤖 @:bot",
         'send_error' => 'A file could not be sent. Please try again later.',
@@ -202,8 +202,8 @@ return [
         ],
         'too_short' => '⚠️ Please type at least 3 characters.',
         'write_prompt' => "✍️ <b>Report an Issue to PARSI Team</b>\n\nPlease describe the issue, error, or concern with this material below.\nOur administrators will review your report shortly:",
-        'success' => "✅ <b>Thank you!</b> Your report has been submitted.\nOur team will review this material shortly.",
-        'sent_success' => "✅ <b>Report Message Sent!</b>\n\nThank you for reaching out. The PARSI team has received your report message and will review it.",
+        'success' => "✅ <b>Thank you </b> Your report has been submitted.\nOur team will review this material shortly.",
+        'sent_success' => "✅ <b>Report Message Sent </b>\n\nThank you for reaching out. The PARSI team has received your report message and will review it.",
         'already_reported' => "ℹ️ You have already reported this material recently. Our team is currently reviewing it.",
         'cancel' => '❌ Cancel',
         'cancelled' => 'Report cancelled.',
@@ -220,7 +220,7 @@ return [
         'channel_btn' => '📢 PARSI Telegram Channel',
         'email_btn' => '📧 PARSI Email Address',
         'write_prompt' => "✍️ <b>Contact PARSI Team</b>\n\nPlease type your message, feedback, or inquiry below.\nOur administrators will review it and reply as soon as possible:",
-        'sent_success' => "✅ <b>Message Sent!</b>\n\nThank you for reaching out. The PARSI team has received your message and will review it.",
+        'sent_success' => "✅ <b>Message Sent </b>\n\nThank you for reaching out. The PARSI team has received your message and will review it.",
         'cancel' => '❌ Cancel',
         'cancelled' => 'Contact cancelled.',
     ],
@@ -249,7 +249,7 @@ return [
     'rate_limit' => [
         'too_many_messages' => "⚠️ <b>Too Many Requests</b>\n\nYou are sending messages too quickly. Please wait <b>:seconds seconds</b> before trying again.",
         'too_many_uploads' => "⚠️ <b>Hourly Upload Limit Reached</b>\n\nTo prevent abuse, student accounts can upload up to 20 files per hour. Please wait <b>:minutes minutes</b> before uploading more materials.",
-        'too_many_clicks' => '⚠️ Please slow down! You are clicking buttons too rapidly.',
+        'too_many_clicks' => '⚠️ Please slow down  You are clicking buttons too rapidly.',
     ],
     'file_security' => [
         'rejected' => "🛡️ <b>Security Alert: File Rejected</b>\n\nThe file <code>:filename</code> could not be accepted for the following reason:\n<b>:reason</b>\n\n📌 <i>Please only upload genuine educational materials such as PDF, Word, PowerPoint, or ZIP files.</i>",
