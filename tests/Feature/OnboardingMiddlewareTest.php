@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Course;
 use App\Models\Program;
+use App\Models\ResourceType;
 use App\Models\Track;
 use App\Models\User;
 use App\Telegram\TelegramUpdateDispatcher;
@@ -26,10 +27,10 @@ class OnboardingMiddlewareTest extends TestCase
     }
 
     #[DataProvider('languages')]
-    public function test_language_selection_completes_onboarding_without_a_program(string $language): void
+    public function test_language_selection_completes_onboarding_without_a_program(string $language, string $settingsNote): void
     {
         $sender = ['id' => 5001, 'first_name' => 'Alex'];
-        $this->start($sender);
+        $this->dispatchText($sender, '/start');
 
         $prompt = $this->lastTelegramRequest('sendMessage');
         $this->assertSame(
@@ -45,14 +46,13 @@ class OnboardingMiddlewareTest extends TestCase
 
         $this->assertSame($language, $user->refresh()->preferred_language);
         $this->assertNull($user->program_id);
-        $this->assertSame(
-            __('bot.onboarding.completed', ['name' => 'Alex'], $language),
-            $this->lastTelegramRequest('editMessageText')['text'],
-        );
+        $completion = $this->lastTelegramRequest('editMessageText')['text'];
+        $this->assertSame(__('bot.onboarding.completed', ['name' => 'Alex'], $language), $completion);
+        $this->assertStringContainsString($settingsNote, $completion);
         $this->assertSame(__('bot.onboarding.ready', [], $language), $this->lastTelegramRequest('sendMessage')['text']);
         $this->assertArrayHasKey('keyboard', $this->lastTelegramRequest('sendMessage')['reply_markup']);
 
-        $this->start($sender);
+        $this->dispatchText($sender, '/start');
         $this->assertSame(
             __('bot.menu.welcome', ['name' => 'Alex'], $language),
             $this->lastTelegramRequest('sendMessage')['text'],
@@ -61,7 +61,37 @@ class OnboardingMiddlewareTest extends TestCase
 
     public static function languages(): array
     {
-        return [['en'], ['it'], ['fa']];
+        return [
+            'English' => ['en', 'You can change your language in Settings.'],
+            'Italian' => ['it', 'Puoi cambiare la lingua nelle impostazioni.'],
+            'Persian' => ['fa', 'می‌توانید زبان را در بخش تنظیمات تغییر دهید.'],
+        ];
+    }
+
+    public function test_settings_can_set_a_program_and_change_language_after_onboarding(): void
+    {
+        $program = $this->program('Computer Engineering', 'BSc');
+        $user = User::factory()->create(['role' => User::ROLE_STUDENT, 'preferred_language' => 'en']);
+        $sender = ['id' => $user->telegram_user_id, 'first_name' => $user->first_name];
+
+        $this->dispatchText($sender, '/settings');
+        $settings = $this->lastTelegramRequest('sendMessage');
+        $this->assertStringContainsString(__('bot.settings.not_selected', [], 'en'), $settings['text']);
+        $this->assertContains('change_program', $this->buttons($settings));
+        $this->assertContains('select_degree_BSc', $this->press($user, 'change_program'));
+        $this->assertContains('select_program_'.$program->id, $this->press($user, 'select_degree_BSc'));
+        $this->press($user, 'select_program_'.$program->id);
+        $this->assertSame($program->id, $user->refresh()->program_id);
+
+        $this->assertContains('onboard_lang_it', $this->press($user, 'change_language'));
+        $this->press($user, 'onboard_lang_it');
+        $this->assertSame('it', $user->refresh()->preferred_language);
+        $this->assertSame($program->id, $user->program_id);
+        $this->dispatchText($sender, '/settings');
+        $this->assertSame(
+            __('bot.settings.title', ['lang' => 'Italiano', 'program' => $program->name], 'it'),
+            $this->lastTelegramRequest('sendMessage')['text'],
+        );
     }
 
     #[DataProvider('resourceActions')]
@@ -70,10 +100,13 @@ class OnboardingMiddlewareTest extends TestCase
         string $degreePrefix,
         string $programPrefix,
         string $yearPrefix,
+        string $coursePrefix,
     ): void {
         $bachelor = $this->program('Computer Engineering', 'BSc');
         $master = $this->program('Data Science', 'MSc');
         $inactive = $this->program('Archived Computing', 'BSc', false);
+        $course = Course::create(['course_code' => 'CS100', 'name' => 'Programming', 'year' => 1, 'is_active' => true]);
+        $course->programs()->attach($bachelor);
         $user = User::factory()->create(['role' => User::ROLE_STUDENT, 'program_id' => $inactive->id]);
 
         $degrees = $this->press($user, $entry);
@@ -91,14 +124,26 @@ class OnboardingMiddlewareTest extends TestCase
         $this->assertContains($year, $this->press($user, $programPrefix.$bachelor->id));
         $this->assertSame($bachelor->id, $user->refresh()->program_id);
         $this->assertContains($year, $this->press($user, $entry));
+        $this->assertContains($coursePrefix.$course->id.'_'.$bachelor->id.'_all', $this->press($user, $year));
     }
 
     public static function resourceActions(): array
     {
         return [
-            'browse' => ['edu_browse', 'browse_degree_', 'prog_', 'course_year_'],
-            'submit' => ['edu_submit_start', 'submit_degree_', 'submit_prog_', 'submit_year_'],
+            'browse' => ['edu_browse', 'browse_degree_', 'prog_', 'course_year_', 'course_'],
+            'submit' => ['edu_submit_start', 'submit_degree_', 'submit_prog_', 'submit_year_', 'submit_course_'],
         ];
+    }
+
+    public function test_empty_catalog_lets_a_student_return_to_the_resource_hub(): void
+    {
+        $user = User::factory()->create(['role' => User::ROLE_STUDENT]);
+
+        $this->assertSame(['back_edu_hub'], $this->press($user, 'edu_browse'));
+        $hub = $this->press($user, 'back_edu_hub');
+        $this->assertContains('search_prompt', $hub);
+        $this->assertContains('edu_submit_start', $hub);
+        $this->assertNull($user->refresh()->program_id);
     }
 
     public function test_leaving_browse_track_selection_does_not_save_an_unfinished_choice(): void
@@ -166,14 +211,49 @@ class OnboardingMiddlewareTest extends TestCase
         $this->assertSame($defaultTrack->id, $user->refresh()->track_id);
     }
 
-    public function test_keyword_search_opens_without_a_program(): void
+    public function test_first_submission_can_choose_all_tracks_and_reach_the_upload_prompt(): void
+    {
+        $program = $this->program('Data Science', 'MSc');
+        $track = $program->tracks()->create(['name' => 'Machine Learning', 'is_active' => true]);
+        $course = $this->courseForTrack($program, $track, 'ML100');
+        $type = ResourceType::create(['code' => 'notes', 'display_name' => 'Notes']);
+        $user = User::factory()->create(['role' => User::ROLE_STUDENT]);
+
+        $this->assertContains('submit_degree_MSc', $this->press($user, 'edu_submit_start'));
+        $this->assertContains('submit_prog_'.$program->id, $this->press($user, 'submit_degree_MSc'));
+        $allTracks = "submit_track_{$program->id}_all";
+        $this->assertContains($allTracks, $this->press($user, 'submit_prog_'.$program->id));
+        $this->assertNull($user->refresh()->program_id);
+
+        $year = "submit_year_{$program->id}_all_1";
+        $this->assertContains($year, $this->press($user, $allTracks));
+        $this->assertSame($program->id, $user->refresh()->program_id);
+        $this->assertNull($user->track_id);
+        $courseButton = "submit_course_{$course->id}_{$program->id}_all";
+        $this->assertContains($courseButton, $this->press($user, $year));
+        $typeButton = "submit_type_{$course->id}_{$type->id}";
+        $this->assertContains($typeButton, $this->press($user, $courseButton));
+        $this->assertContains('cancel_upload', $this->press($user, $typeButton));
+        $this->assertSame([
+            'course_id' => $course->id,
+            'resource_type_id' => $type->id,
+            'step' => 'awaiting_title',
+        ], cache()->get("user_upload_state:{$user->id}"));
+    }
+
+    public function test_keyword_search_returns_courses_without_a_saved_program(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_STUDENT]);
+        $program = $this->program('Computer Engineering', 'BSc');
+        $course = Course::create(['course_code' => 'CS101', 'name' => 'Computer Science', 'is_active' => true]);
+        $course->programs()->attach($program);
 
         $this->assertContains('search_prompt', $this->press($user, 'back_edu_hub'));
         $this->press($user, 'search_prompt');
 
         $this->assertSame(['step' => 'awaiting_search_query'], cache()->get("user_search_state:{$user->id}"));
+        $this->dispatchText(['id' => $user->telegram_user_id, 'first_name' => $user->first_name], 'CS101');
+        $this->assertContains("course_{$course->id}_{$program->id}_all", $this->buttons($this->lastTelegramRequest('sendMessage')));
         $this->assertNull($user->refresh()->program_id);
     }
 
@@ -196,14 +276,14 @@ class OnboardingMiddlewareTest extends TestCase
         ]);
     }
 
-    private function start(array $sender): void
+    private function dispatchText(array $sender, string $text): void
     {
         app(TelegramUpdateDispatcher::class)->dispatch([
             'message' => [
                 'message_id' => 1,
                 'chat' => ['id' => $sender['id'], 'type' => 'private'],
                 'from' => $sender,
-                'text' => '/start',
+                'text' => $text,
             ],
         ]);
     }
@@ -220,7 +300,12 @@ class OnboardingMiddlewareTest extends TestCase
             ],
         ]);
 
-        return collect($this->lastTelegramRequest('editMessageText', $requestCount)['reply_markup']['inline_keyboard'] ?? [])
+        return $this->buttons($this->lastTelegramRequest('editMessageText', $requestCount));
+    }
+
+    private function buttons(Request $request): array
+    {
+        return collect($request['reply_markup']['inline_keyboard'] ?? [])
             ->collapse()
             ->pluck('callback_data')
             ->all();

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AcademicYearAdminController;
 use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AnnouncementAdminController;
 use App\Http\Controllers\Admin\BotAccessController;
 use App\Http\Controllers\Admin\CourseAdminController;
 use App\Http\Controllers\Admin\LogAdminController;
@@ -40,6 +41,9 @@ Route::middleware(['auth', IsAdmin::class])->prefix('admin')->group(function () 
     Route::get('/dashboard', [AdminDashboardController::class, 'index']);
     Route::get('/bot-access', [BotAccessController::class, 'edit'])->name('admin.bot-access.edit');
     Route::put('/bot-access', [BotAccessController::class, 'update'])->name('admin.bot-access.update');
+    Route::resource('announcements', AnnouncementAdminController::class)->names('admin.announcements');
+    Route::post('/announcements/{announcement}/test', [AnnouncementAdminController::class, 'testSend'])->name('admin.announcements.test');
+    Route::post('/announcements/{announcement}/queue', [AnnouncementAdminController::class, 'queue'])->name('admin.announcements.queue');
 
     // 1. Resources
     Route::get('/resources', [ResourceAdminController::class, 'index'])->name('admin.resources.index');

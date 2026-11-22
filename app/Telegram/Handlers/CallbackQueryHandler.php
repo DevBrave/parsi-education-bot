@@ -62,7 +62,9 @@ class CallbackQueryHandler
         // Acknowledge the button press to remove the loading spinner for student menus
         $this->telegram->answerCallbackQuery($callbackId);
 
-        if ($data === 'back_edu_hub') {
+        if ($data === 'open_main_menu') {
+            $this->messageHandler->sendMainMenu($chatId, $user);
+        } elseif ($data === 'back_edu_hub') {
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,

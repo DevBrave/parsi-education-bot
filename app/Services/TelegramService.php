@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Announcement;
+use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -68,6 +70,18 @@ class TelegramService
         }
 
         return $response;
+    }
+
+    public function sendAnnouncement(User $recipient, Announcement $announcement): Response
+    {
+        $keyboard = $announcement->include_menu_button ? [
+            'inline_keyboard' => [[[
+                'text' => __('bot.menu.open_menu', [], $recipient->preferred_language ?? 'en'),
+                'callback_data' => 'open_main_menu',
+            ]]],
+        ] : null;
+
+        return $this->sendMessage($recipient->telegram_user_id, e($announcement->message), $keyboard);
     }
 
     /**

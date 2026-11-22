@@ -18,6 +18,7 @@ return [
         'ready' => 'What would you like to do?',
     ],
     'menu' => [
+        'open_menu' => 'Open Main Menu',
         'welcome' => "👋 <b>Welcome  to PARSI Education Bot, :name </b>\n\n"
             ."PARSI Student Association is here to support you with educational materials, student services, and university guides.\n\n"
             .'What service would you like to use today?',
