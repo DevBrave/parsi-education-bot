@@ -86,6 +86,44 @@ class AnnouncementAdminTest extends TestCase
         $this->assertDatabaseCount('announcements', 0);
     }
 
+    public function test_announcement_list_renders_links_when_it_has_multiple_pages(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
+        $oldest = $this->announcement(['title' => 'Announcement on page two']);
+        for ($index = 0; $index < 20; $index++) {
+            $this->announcement();
+        }
+
+        $this->get(route('admin.announcements.index'))
+            ->assertOk()
+            ->assertSee('rel="next"', false)
+            ->assertDontSee($oldest->title);
+        $this->get(route('admin.announcements.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('rel="prev"', false)
+            ->assertSee($oldest->title);
+    }
+
+    public function test_announcement_deliveries_render_links_when_they_have_multiple_pages(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
+        Queue::fake();
+        $announcement = $this->announcement();
+        User::factory()->count(30)->create(['role' => User::ROLE_STUDENT]);
+        $last = $this->student(['username' => 'recipient_on_page_two']);
+
+        $this->post(route('admin.announcements.queue', $announcement))->assertSessionHas('success');
+        $this->get(route('admin.announcements.show', $announcement))
+            ->assertOk()
+            ->assertSee('rel="next"', false)
+            ->assertDontSee($last->username);
+        $this->get(route('admin.announcements.show', ['announcement' => $announcement, 'page' => 2]))
+            ->assertOk()
+            ->assertSee('rel="prev"', false)
+            ->assertSee($last->username);
+        Http::assertNothingSent();
+    }
+
     public function test_queue_resolves_the_combined_filters_at_submission_time(): void
     {
         $this->actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));

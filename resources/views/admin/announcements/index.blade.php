@@ -26,6 +26,6 @@
                 </tbody>
             </table>
         </div>
-        @include('admin.partials.pagination', ['paginator' => $announcements])
+        {{ $announcements->links() }}
     </div>
 @endsection

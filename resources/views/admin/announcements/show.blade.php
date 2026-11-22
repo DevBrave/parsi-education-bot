@@ -92,7 +92,7 @@
                     </tbody>
                 </table>
             </div>
-            @include('admin.partials.pagination', ['paginator' => $deliveries])
+            {{ $deliveries->links() }}
         </div>
     @endif
 @endsection
