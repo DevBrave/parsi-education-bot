@@ -19,9 +19,7 @@ class CheckUserOnboarding
     public function handle(array $payload, User $user): bool
     {
         $callbackData = $payload['callback_query']['data'] ?? '';
-        bot_log('telegram')->debug([
-            'callback_data' => $callbackData,
-        ]);
+       
         $isOnboardingCallback = str_starts_with($callbackData, 'onboard_lang_');
         // || str_starts_with($callbackData, 'onboard_prog_')
         // || str_starts_with($callbackData, 'select_degree_')
